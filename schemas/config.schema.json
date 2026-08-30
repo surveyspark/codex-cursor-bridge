@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/surveyspark/codex-cursor-bridge/schemas/config.schema.json",
+  "title": "Bridge configuration",
+  "description": "User-level (~/.config/codex-cursor-bridge/config.json) or project-level (.handoff/config.json) configuration. Secrets are never stored in these files.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "preferredCursorAdapter": {
+      "enum": ["auto", "sdk", "acp", "cli-fallback"],
+      "default": "auto"
+    },
+    "codexBinaryPath": { "type": "string", "maxLength": 4096 },
+    "cursorBinaryPath": { "type": "string", "maxLength": 4096 },
+    "defaultTimeoutMs": {
+      "type": "integer",
+      "minimum": 30000,
+      "maximum": 86400000,
+      "default": 1800000
+    },
+    "maxConcurrency": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16,
+      "default": 2
+    },
+    "jobRetentionDays": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365,
+      "default": 14
+    },
+    "completedRetentionDays": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365,
+      "default": 7
+    },
+    "worktreeRoot": {
+      "type": "string",
+      "maxLength": 4096,
+      "description": "Directory under which isolated worktrees are created. Defaults to <state>/worktrees."
+    },
+    "defaultPermissionProfile": {
+      "enum": ["read-only", "isolated-workspace-write", "current-workspace-write"],
+      "default": "read-only"
+    },
+    "defaultImplementProfile": {
+      "enum": ["isolated-workspace-write", "current-workspace-write"],
+      "default": "isolated-workspace-write"
+    },
+    "defaultModel": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "description": "Model override for delegated agents. Null uses the host's configured default. Leave unset unless you know what you are doing."
+    },
+    "defaultReasoningEffort": {
+      "enum": [null, "low", "medium", "high", "xhigh"],
+      "default": null
+    },
+    "networkPolicy": {
+      "enum": ["denied", "allowed"],
+      "default": "denied",
+      "description": "Network access for delegated agents where the underlying tool supports the distinction."
+    },
+    "debugLogging": { "type": "boolean", "default": false },
+    "maxOutputBytes": {
+      "type": "integer",
+      "minimum": 10000,
+      "maximum": 100000000,
+      "default": 2000000
+    },
+    "autoReviewAfterExecution": {
+      "type": "boolean",
+      "default": false,
+      "description": "Optional post-execution Codex review of Cursor's diff. Disabled by default."
+    },
+    "autoCorrectionPass": {
+      "type": "boolean",
+      "default": false,
+      "description": "When review finds changes-required, send exactly one correction message to the same Cursor session."
+    },
+    "allowNonInteractiveCliFallback": { "type": "boolean", "default": false },
+    "maxHandoffDepth": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2,
+      "default": 1
+    },
+    "approvalTimeoutMs": {
+      "type": "integer",
+      "minimum": 5000,
+      "maximum": 3600000,
+      "default": 120000
+    }
+  }
+}

@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest an idea for the bridge or plugins
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What are you trying to do? What is missing or painful?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like to happen? Include alternatives you considered.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Official docs links, version constraints, or prior art.

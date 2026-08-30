@@ -1,0 +1,27 @@
+{
+  "name": "@codex-cursor-bridge/cursor-adapter",
+  "version": "0.1.0",
+  "description": "Cursor adapter for codex-cursor-bridge: official SDK, ACP over stdio, and non-interactive CLI fallback",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "@codex-cursor-bridge/bridge-core": "0.1.0"
+  },
+  "optionalPeerDependencies": {
+    "@cursor/sdk": ">=1.0.0"
+  }
+}

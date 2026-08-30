@@ -1,0 +1,58 @@
+{
+  "name": "codex-cursor-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first, two-way delegation bridge between Codex and Cursor agents. Not affiliated with or endorsed by OpenAI or Cursor.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/surveyspark/codex-cursor-bridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/surveyspark/codex-cursor-bridge/issues"
+  },
+  "keywords": [
+    "codex",
+    "cursor",
+    "agent",
+    "delegation",
+    "mcp",
+    "handoff"
+  ],
+  "scripts": {
+    "build": "tsc -b packages/tsconfig.project.json && node scripts/build-bundle.mjs",
+    "typecheck": "tsc -b packages/tsconfig.project.json --dry || tsc -b packages/tsconfig.project.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:protocol": "vitest run --project protocol",
+    "test:integration": "vitest run --project integration",
+    "test:security": "vitest run --project security",
+    "test:contract": "vitest run --project contract",
+    "test:e2e": "node tests/e2e/run.mjs",
+    "package": "node scripts/package-release.mjs",
+    "validate:manifests": "node scripts/validate-manifests.mjs",
+    "doctor": "node bundles/codex-cursor-bridge.mjs doctor",
+    "clean": "node scripts/clean.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.2",
+    "@types/node": "20.19.30",
+    "@vitest/coverage-v8": "3.2.4",
+    "esbuild": "0.27.3",
+    "eslint": "9.39.2",
+    "prettier": "3.7.4",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.50.1",
+    "vitest": "3.2.4"
+  }
+}

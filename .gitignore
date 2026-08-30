@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+bundles/
+*.tsbuildinfo
+
+# Test artifacts
+coverage/
+.vitest/
+
+# Bridge job state (never commit real job logs)
+.handoff/
+!handoff/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Environment / secrets — never commit
+.env
+.env.*
+*.pem
+*.key
+auth.json
+
+# Release artifacts
+release/
+*.tgz

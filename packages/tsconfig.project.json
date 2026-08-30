@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./bridge-core" },
+    { "path": "./job-store" },
+    { "path": "./codex-adapter" },
+    { "path": "./cursor-adapter" },
+    { "path": "./orchestrator" },
+    { "path": "./mcp-server" },
+    { "path": "./cli" },
+    { "path": "./test-support" }
+  ]
+}

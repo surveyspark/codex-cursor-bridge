@@ -1,0 +1,6 @@
+# Security review policy for dependency review action.
+# Fail on high or critical severity vulnerabilities introduced by PRs.
+target: dev
+paths-ignore:
+  - "**/*.md"
+  - "**/*.txt"

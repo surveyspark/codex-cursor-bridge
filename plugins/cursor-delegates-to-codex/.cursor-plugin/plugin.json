@@ -1,0 +1,28 @@
+{
+  "name": "codex-cursor-bridge",
+  "version": "0.1.0",
+  "description": "Delegate difficult work from Cursor to Codex: investigation, adversarial review, rescue, planning, and isolated implementation with background job tracking. Independent interoperability plugin; not affiliated with OpenAI or Cursor.",
+  "author": {
+    "name": "codex-cursor-bridge contributors"
+  },
+  "repository": "https://github.com/surveyspark/codex-cursor-bridge",
+  "license": "Apache-2.0",
+  "keywords": [
+    "codex",
+    "delegation",
+    "review",
+    "debugging",
+    "handoff"
+  ],
+  "skills": "./skills/",
+  "commands": "./commands/",
+  "mcp": {
+    "mcpServers": {
+      "codex-cursor-bridge": {
+        "command": "codex-cursor-bridge",
+        "args": ["mcp", "--host", "cursor"],
+        "env": {}
+      }
+    }
+  }
+}

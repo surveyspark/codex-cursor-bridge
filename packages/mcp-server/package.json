@@ -1,0 +1,28 @@
+{
+  "name": "@codex-cursor-bridge/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP stdio server exposing host-scoped bridge tools (Codex tools for Cursor, Cursor tools for Codex)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "@codex-cursor-bridge/bridge-core": "0.1.0",
+    "@codex-cursor-bridge/job-store": "0.1.0",
+    "@codex-cursor-bridge/codex-adapter": "0.1.0",
+    "@codex-cursor-bridge/cursor-adapter": "0.1.0",
+    "@codex-cursor-bridge/orchestrator": "0.1.0"
+  }
+}

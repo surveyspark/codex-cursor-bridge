@@ -1,0 +1,22 @@
+{
+  "name": "@codex-cursor-bridge/test-support",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fake agents, git fixtures, and helpers for codex-cursor-bridge tests",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "@codex-cursor-bridge/bridge-core": "0.1.0"
+  }
+}

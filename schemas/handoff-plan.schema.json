@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/surveyspark/codex-cursor-bridge/schemas/handoff-plan.schema.json",
+  "title": "Bridge handoff plan",
+  "description": "Machine-readable plan produced by a planner host (e.g. Codex) and executed by an executor host (e.g. Cursor). Validated before execution is allowed.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "task",
+    "goal",
+    "observedRepositoryFacts",
+    "implementationSteps",
+    "acceptanceCriteria",
+    "allowedPaths",
+    "plannerSummary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "task": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20000,
+      "description": "The original user task, verbatim or lightly compressed."
+    },
+    "goal": { "type": "string", "minLength": 1, "maxLength": 5000 },
+    "nonGoals": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 2000 },
+      "maxItems": 50
+    },
+    "observedRepositoryFacts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": ["fact", "evidence"],
+        "additionalProperties": false,
+        "properties": {
+          "fact": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 2000 },
+      "maxItems": 50
+    },
+    "constraints": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 2000 },
+      "maxItems": 50
+    },
+    "implementationSteps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "rationale", "verification"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^step-[0-9]+$",
+            "maxLength": 32
+          },
+          "description": { "type": "string", "minLength": 1, "maxLength": 5000 },
+          "rationale": { "type": "string", "minLength": 1, "maxLength": 5000 },
+          "likelyFiles": {
+            "type": "array",
+            "items": { "type": "string", "maxLength": 1024 },
+            "maxItems": 100
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^step-[0-9]+$" },
+            "maxItems": 50
+          },
+          "verification": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          }
+        }
+      }
+    },
+    "acceptanceCriteria": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "items": { "type": "string", "minLength": 1, "maxLength": 2000 }
+    },
+    "testPlan": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 1000 },
+      "maxItems": 50,
+      "description": "Test commands or test-selection guidance for the executor."
+    },
+    "risks": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": ["risk", "mitigation"],
+        "additionalProperties": false,
+        "properties": {
+          "risk": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "mitigation": { "type": "string", "minLength": 1, "maxLength": 2000 }
+        }
+      }
+    },
+    "rollbackPlan": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 1000 },
+      "maxItems": 20
+    },
+    "allowedPaths": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 200,
+      "items": { "type": "string", "minLength": 1, "maxLength": 1024 },
+      "description": "Repository-relative glob patterns the executor may write. Use '.' or 'packages/**' style patterns; never absolute paths."
+    },
+    "forbiddenActions": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 2000 },
+      "maxItems": 50
+    },
+    "plannerSummary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 10000,
+      "description": "Concise human-readable plan summary."
+    },
+    "generatedBy": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Host and adapter that produced the plan, e.g. 'codex@app-server'."
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

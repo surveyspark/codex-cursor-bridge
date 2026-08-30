@@ -1,0 +1,30 @@
+name: Compatibility report
+description: Report results from running the bridge with a specific Codex/Cursor version
+labels: ["compatibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Run `codex-cursor-bridge doctor --json` and paste the JSON output
+        (the doctor command redacts secrets).
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      placeholder: |
+        - OS: 
+        - Node: 
+        - Codex CLI: 
+        - Cursor CLI: 
+        - Bridge: 
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Doctor JSON output
+      render: json
+  - type: textarea
+    id: notes
+    attributes:
+      label: What worked / what failed

@@ -1,0 +1,32 @@
+{
+  "name": "@codex-cursor-bridge/cli",
+  "version": "0.1.0",
+  "description": "codex-cursor-bridge command line interface",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "codex-cursor-bridge": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "@codex-cursor-bridge/bridge-core": "0.1.0",
+    "@codex-cursor-bridge/job-store": "0.1.0",
+    "@codex-cursor-bridge/codex-adapter": "0.1.0",
+    "@codex-cursor-bridge/cursor-adapter": "0.1.0",
+    "@codex-cursor-bridge/orchestrator": "0.1.0",
+    "@codex-cursor-bridge/mcp-server": "0.1.0"
+  }
+}

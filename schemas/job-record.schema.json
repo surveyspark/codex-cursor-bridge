@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/surveyspark/codex-cursor-bridge/schemas/job-record.schema.json",
+  "title": "Bridge job record",
+  "description": "Persistent record of a delegation job. Stored under the OS user state directory; never contains secrets.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "jobId",
+    "originHost",
+    "targetHost",
+    "adapter",
+    "mode",
+    "permissionProfile",
+    "handoffDepth",
+    "maxHandoffDepth",
+    "repoRoot",
+    "cwd",
+    "status",
+    "createdAt",
+    "updatedAt",
+    "events"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "jobId": {
+      "type": "string",
+      "pattern": "^job_[0-9a-f]{32}$",
+      "description": "Bridge job identifier. Distinct from any native agent/thread/session id."
+    },
+    "parentJobId": {
+      "type": ["string", "null"],
+      "pattern": "^job_[0-9a-f]{32}$"
+    },
+    "originHost": { "enum": ["cursor", "codex", "cli"] },
+    "targetHost": { "enum": ["codex", "cursor"] },
+    "adapter": {
+      "type": "string",
+      "enum": [
+        "codex-app-server",
+        "codex-exec-fallback",
+        "cursor-sdk",
+        "cursor-acp",
+        "cursor-cli-fallback"
+      ]
+    },
+    "nativeId": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "description": "Native Codex thread/session id or Cursor agent/session id, when known."
+    },
+    "mode": {
+      "enum": [
+        "investigate",
+        "review",
+        "adversarial-review",
+        "rescue",
+        "plan",
+        "implement"
+      ]
+    },
+    "permissionProfile": {
+      "enum": ["read-only", "isolated-workspace-write", "current-workspace-write"]
+    },
+    "handoffDepth": { "type": "integer", "minimum": 0, "maximum": 2 },
+    "maxHandoffDepth": { "type": "integer", "minimum": 0, "maximum": 2 },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requestId": { "type": ["string", "null"], "maxLength": 200 },
+        "tool": { "type": ["string", "null"], "maxLength": 100 },
+        "client": { "type": ["string", "null"], "maxLength": 200 }
+      }
+    },
+    "repoRoot": { "type": "string", "minLength": 1 },
+    "cwd": { "type": "string", "minLength": 1 },
+    "worktree": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string" },
+        "branch": { "type": "string" },
+        "baseRef": { "type": "string" },
+        "created": { "type": "boolean" }
+      }
+    },
+    "task": { "type": "string", "maxLength": 40000 },
+    "status": {
+      "enum": [
+        "queued",
+        "starting",
+        "running",
+        "waiting-for-approval",
+        "waiting-for-input",
+        "completed",
+        "failed",
+        "cancelled",
+        "timed-out"
+      ]
+    },
+    "exitCode": { "type": ["integer", "null"] },
+    "pid": { "type": ["integer", "null"] },
+    "pidHostBootId": { "type": ["string", "null"], "maxLength": 128 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "startedAt": { "type": ["string", "null"], "format": "date-time" },
+    "finishedAt": { "type": ["string", "null"], "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "timeoutMs": { "type": ["integer", "null"], "minimum": 1000 },
+    "deadlineAt": { "type": ["string", "null"], "format": "date-time" },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deleteAfter": { "type": ["string", "null"], "format": "date-time" },
+        "keepResult": { "type": "boolean" }
+      }
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 5000,
+      "description": "Normalized event log (truncated with truncation markers when over limits).",
+      "items": {
+        "type": "object",
+        "required": ["ts", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "ts": { "type": "string", "format": "date-time" },
+          "type": { "type": "string", "maxLength": 100 },
+          "level": { "enum": ["debug", "info", "warn", "error"] },
+          "data": {}
+        }
+      }
+    },
+    "eventsTruncated": { "type": "boolean" },
+    "result": {
+      "oneOf": [{ "$ref": "result.schema.json" }, { "type": "null" }]
+    },
+    "followUps": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": ["ts", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "ts": { "type": "string", "format": "date-time" },
+          "message": { "type": "string", "maxLength": 20000 },
+          "accepted": { "type": "boolean" },
+          "note": { "type": "string", "maxLength": 2000 }
+        }
+      }
+    },
+    "approvals": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "required": ["ts", "kind", "decision"],
+        "additionalProperties": false,
+        "properties": {
+          "ts": { "type": "string", "format": "date-time" },
+          "kind": { "type": "string", "maxLength": 100 },
+          "summary": { "type": "string", "maxLength": 4000 },
+          "decision": { "enum": ["approved", "denied", "timed-out", "auto-denied"] },
+          "reason": { "type": "string", "maxLength": 2000 }
+        }
+      }
+    }
+  }
+}

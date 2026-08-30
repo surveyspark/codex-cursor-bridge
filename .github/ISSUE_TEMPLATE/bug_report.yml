@@ -1,0 +1,56 @@
+name: Bug report
+description: Report a problem with the bridge, plugins, or adapters
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please redact any secrets
+        before pasting logs.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node.js version, Codex CLI version, Cursor CLI version, bridge doctor output
+      placeholder: |
+        - OS: macOS 15
+        - Node.js: v20.19.0
+        - Codex CLI: codex-cli 0.145.0
+        - Cursor CLI: not installed
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Redacted logs only. The project redacts common secret patterns, but double-check before pasting.
+      render: shell

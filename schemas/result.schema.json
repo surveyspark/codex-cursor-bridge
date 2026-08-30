@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/surveyspark/codex-cursor-bridge/schemas/result.schema.json",
+  "title": "Bridge job result",
+  "description": "Normalized final result of a delegation job, returned by result tools and embedded in job records.",
+  "type": "object",
+  "required": ["jobId", "nativeId", "adapter", "status", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "jobId": { "type": "string", "pattern": "^job_[0-9a-f]{32}$" },
+    "nativeId": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "description": "Codex thread/session id or Cursor agent/session id."
+    },
+    "adapter": {
+      "enum": [
+        "codex-app-server",
+        "codex-exec-fallback",
+        "cursor-sdk",
+        "cursor-acp",
+        "cursor-cli-fallback"
+      ]
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "failed",
+        "cancelled",
+        "timed-out"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 10000,
+      "description": "Concise human-readable summary of what happened and what was found or changed."
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "type": "string", "maxLength": 4000 }
+    },
+    "changedFiles": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "required": ["path", "change"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "maxLength": 1024 },
+          "change": { "enum": ["added", "modified", "deleted", "renamed"] }
+        }
+      }
+    },
+    "diffStat": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "filesChanged": { "type": "integer", "minimum": 0 },
+        "insertions": { "type": "integer", "minimum": 0 },
+        "deletions": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "diffPatchPath": {
+      "type": ["string", "null"],
+      "maxLength": 4096,
+      "description": "Project-relative path to an exported .patch artifact under .handoff/, when produced."
+    },
+    "commands": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": ["command"],
+        "additionalProperties": false,
+        "properties": {
+          "command": { "type": "string", "maxLength": 2000 },
+          "exitCode": { "type": ["integer", "null"] },
+          "aggregatedStatus": {
+            "enum": ["success", "failure", "unknown"]
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": ["name", "outcome"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "maxLength": 500 },
+          "outcome": { "enum": ["passed", "failed", "skipped", "unknown"] },
+          "detail": { "type": "string", "maxLength": 4000 }
+        }
+      }
+    },
+    "approvals": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "required": ["kind", "decision"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "type": "string", "maxLength": 100 },
+          "summary": { "type": "string", "maxLength": 4000 },
+          "decision": { "enum": ["approved", "denied", "timed-out", "auto-denied"] }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "type": "string", "maxLength": 4000 }
+    },
+    "blockers": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "type": "string", "maxLength": 4000 }
+    },
+    "residualRisks": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "type": "string", "maxLength": 4000 }
+    },
+    "artifacts": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": ["path", "kind"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "maxLength": 4096 },
+          "kind": { "enum": ["patch", "log", "plan", "report", "other"] }
+        }
+      }
+    },
+    "continuation": {
+      "type": "object",
+      "required": ["supported", "how"],
+      "additionalProperties": false,
+      "properties": {
+        "supported": { "type": "boolean" },
+        "how": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "How to continue this native session, e.g. 'codex_reply with nativeId' or 'codex exec resume <id>' or 'not supported by this adapter'."
+        }
+      }
+    },
+    "startedAt": { "type": ["string", "null"], "format": "date-time" },
+    "finishedAt": { "type": ["string", "null"], "format": "date-time" },
+    "failure": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "type": "string", "maxLength": 100 },
+        "message": { "type": "string", "maxLength": 8000 },
+        "retriable": { "type": "boolean" }
+      }
+    }
+  }
+}
