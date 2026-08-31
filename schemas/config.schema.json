@@ -43,7 +43,11 @@
       "description": "Directory under which isolated worktrees are created. Defaults to <state>/worktrees."
     },
     "defaultPermissionProfile": {
-      "enum": ["read-only", "isolated-workspace-write", "current-workspace-write"],
+      "enum": [
+        "read-only",
+        "isolated-workspace-write",
+        "current-workspace-write"
+      ],
       "default": "read-only"
     },
     "defaultImplementProfile": {

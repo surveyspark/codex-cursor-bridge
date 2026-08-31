@@ -22,8 +22,16 @@ import {
   type StartRequest,
 } from "@codex-cursor-bridge/bridge-core";
 import { JobStore, newJobId } from "@codex-cursor-bridge/job-store";
-import type { AgentAdapter, AdapterRunContext } from "@codex-cursor-bridge/codex-adapter";
-import { defaultWorktreeRoot, jobsDir, loadConfig, logsDir } from "./config-resolve.js";
+import type {
+  AgentAdapter,
+  AdapterRunContext,
+} from "@codex-cursor-bridge/codex-adapter";
+import {
+  defaultWorktreeRoot,
+  jobsDir,
+  loadConfig,
+  logsDir,
+} from "./config-resolve.js";
 import {
   collectCurrentDiffSummary,
   collectWorktreeDiff,
@@ -36,7 +44,10 @@ export interface JobManagerOptions {
   repoRoot: string;
   logger?: Logger;
   /** Adapter selection is injected so CLI/MCP servers share one code path. */
-  selectAdapter: (request: StartRequest, record: JobRecord) => Promise<{ adapter: AgentAdapter; reason: string }>;
+  selectAdapter: (
+    request: StartRequest,
+    record: JobRecord,
+  ) => Promise<{ adapter: AgentAdapter; reason: string }>;
 }
 
 export interface StartJobOptions {
@@ -67,7 +78,13 @@ export class JobManager {
   /** Request metadata not representable in schema v1.0 job records
    *  (constraints/expectedOutput/model/effort/baseRef). Process-local by
    *  design: MCP tools run jobs synchronously; CLI start waits. */
-  private readonly requestMeta = new Map<string, Pick<StartRequest, "constraints" | "expectedOutput" | "model" | "reasoningEffort" | "baseRef">>();
+  private readonly requestMeta = new Map<
+    string,
+    Pick<
+      StartRequest,
+      "constraints" | "expectedOutput" | "model" | "reasoningEffort" | "baseRef"
+    >
+  >();
 
   constructor(opts: JobManagerOptions) {
     const loaded = loadConfig(opts.repoRoot, opts.config);
@@ -106,20 +123,30 @@ export class JobManager {
       ...request,
       cwd: canonicalize(request.cwd),
       mode: request.mode ?? "investigate",
-      permissionProfile: request.permissionProfile ?? this.profileForMode(request.mode ?? "investigate"),
+      permissionProfile:
+        request.permissionProfile ??
+        this.profileForMode(request.mode ?? "investigate"),
       background: request.background ?? true,
       origin: {
         host: origin.host,
-        ...(request.origin?.requestId ? { requestId: request.origin.requestId } : {}),
-        ...(request.origin?.parentJobId ? { parentJobId: request.origin.parentJobId } : {}),
+        ...(request.origin?.requestId
+          ? { requestId: request.origin.requestId }
+          : {}),
+        ...(request.origin?.parentJobId
+          ? { parentJobId: request.origin.parentJobId }
+          : {}),
         handoffDepth: request.origin?.handoffDepth ?? 0,
-        maxHandoffDepth: request.origin?.maxHandoffDepth ?? this.config.maxHandoffDepth,
+        maxHandoffDepth:
+          request.origin?.maxHandoffDepth ?? this.config.maxHandoffDepth,
       },
     };
 
     // Recursion control.
     const depth = requestNorm.origin!.handoffDepth;
-    const maxDepth = Math.min(requestNorm.origin!.maxHandoffDepth, HARD_MAX_HANDOFF_DEPTH);
+    const maxDepth = Math.min(
+      requestNorm.origin!.maxHandoffDepth,
+      HARD_MAX_HANDOFF_DEPTH,
+    );
     if (depth > maxDepth) {
       throw new BridgeError(
         "RECURSION_BLOCKED",
@@ -127,7 +154,10 @@ export class JobManager {
       );
     }
     if (origin.host !== "cli" && this.targetOf(origin.host) === undefined) {
-      throw new BridgeError("BRIDGE_USAGE", `unknown origin host ${origin.host}`);
+      throw new BridgeError(
+        "BRIDGE_USAGE",
+        `unknown origin host ${origin.host}`,
+      );
     }
 
     const git = await inspectGit(requestNorm.cwd);
@@ -145,7 +175,11 @@ export class JobManager {
       permissionProfile: requestNorm.permissionProfile,
       handoffDepth: depth,
       maxHandoffDepth: maxDepth,
-      origin: { requestId: requestNorm.origin!.requestId ?? null, tool: origin.tool ?? null, client: origin.client ?? null },
+      origin: {
+        requestId: requestNorm.origin!.requestId ?? null,
+        tool: origin.tool ?? null,
+        client: origin.client ?? null,
+      },
       repoRoot: this.repoRoot,
       cwd: requestNorm.cwd,
       worktree: null,
@@ -158,7 +192,12 @@ export class JobManager {
       finishedAt: null,
       timeoutMs,
       deadlineAt: new Date(Date.now() + timeoutMs).toISOString(),
-      retention: { deleteAfter: new Date(Date.now() + this.config.completedRetentionDays * 86_400_000).toISOString(), keepResult: true },
+      retention: {
+        deleteAfter: new Date(
+          Date.now() + this.config.completedRetentionDays * 86_400_000,
+        ).toISOString(),
+        keepResult: true,
+      },
       followUps: [],
       approvals: [],
       ...(git.isGit ? {} : {}),
@@ -166,10 +205,16 @@ export class JobManager {
 
     // Stash request metadata for the runner (job record keeps the prompt only).
     this.requestMeta.set(jobId, {
-      ...(requestNorm.constraints ? { constraints: requestNorm.constraints } : {}),
-      ...(requestNorm.expectedOutput ? { expectedOutput: requestNorm.expectedOutput } : {}),
+      ...(requestNorm.constraints
+        ? { constraints: requestNorm.constraints }
+        : {}),
+      ...(requestNorm.expectedOutput
+        ? { expectedOutput: requestNorm.expectedOutput }
+        : {}),
       ...(requestNorm.model ? { model: requestNorm.model } : {}),
-      ...(requestNorm.reasoningEffort ? { reasoningEffort: requestNorm.reasoningEffort } : {}),
+      ...(requestNorm.reasoningEffort
+        ? { reasoningEffort: requestNorm.reasoningEffort }
+        : {}),
       ...(requestNorm.baseRef ? { baseRef: requestNorm.baseRef } : {}),
     });
     this.store.appendEvent(jobId, {
@@ -181,7 +226,12 @@ export class JobManager {
         handoffDepth: depth,
         maxHandoffDepth: maxDepth,
         originHost: origin.host,
-        git: { isGit: git.isGit, hasCommits: git.hasCommits, dirty: git.dirty, branch: git.branch },
+        git: {
+          isGit: git.isGit,
+          hasCommits: git.hasCommits,
+          dirty: git.dirty,
+          branch: git.branch,
+        },
       },
     });
 
@@ -195,10 +245,16 @@ export class JobManager {
    * bundled design, MCP tools and the CLI both use wait=true by default and
    * the background contract is preserved by job records surviving the run.
    */
-  async run(jobId: string, _opts: { onEvent?: (e: { type: string; data?: unknown }) => void } = {}): Promise<JobResult> {
+  async run(
+    jobId: string,
+    _opts: { onEvent?: (e: { type: string; data?: unknown }) => void } = {},
+  ): Promise<JobResult> {
     const record = this.store.get(jobId);
     if (record.status !== "queued") {
-      throw new BridgeError("JOB_INVALID_TRANSITION", `job ${jobId} is ${record.status}, expected queued`);
+      throw new BridgeError(
+        "JOB_INVALID_TRANSITION",
+        `job ${jobId} is ${record.status}, expected queued`,
+      );
     }
     // Register the abort controller before any await so a cancel() racing
     // with startup still reaches the adapter.
@@ -206,21 +262,32 @@ export class JobManager {
     this.aborts.set(jobId, abort);
     if (abort.signal.aborted) {
       // cancel() already ran during startup: record and return.
-      return await this.finalize(jobId, {
+      return await this.finalize(
         jobId,
-        nativeId: null,
-        adapter: record.adapter,
-        status: "cancelled",
-        summary: "job cancelled before the agent started.",
-        continuation: { supported: false, how: "job never started" },
-        startedAt: null,
-        finishedAt: new Date().toISOString(),
-        failure: { code: "JOB_CANCELLED", message: "cancelled during startup", retriable: false },
-      }, record.cwd);
+        {
+          jobId,
+          nativeId: null,
+          adapter: record.adapter,
+          status: "cancelled",
+          summary: "job cancelled before the agent started.",
+          continuation: { supported: false, how: "job never started" },
+          startedAt: null,
+          finishedAt: new Date().toISOString(),
+          failure: {
+            code: "JOB_CANCELLED",
+            message: "cancelled during startup",
+            retriable: false,
+          },
+        },
+        record.cwd,
+      );
     }
     const git = await inspectGit(record.cwd);
     await this.gate();
-    const timeout = setTimeout(() => abort.abort(new Error("timeout")), record.timeoutMs ?? this.config.defaultTimeoutMs);
+    const timeout = setTimeout(
+      () => abort.abort(new Error("timeout")),
+      record.timeoutMs ?? this.config.defaultTimeoutMs,
+    );
 
     try {
       this.store.update(jobId, (r) => {
@@ -233,7 +300,10 @@ export class JobManager {
       this.store.update(jobId, (r) => {
         r.adapter = adapter.name;
       });
-      this.store.appendEvent(jobId, { type: "adapter.selected", data: { adapter: adapter.name, reason } });
+      this.store.appendEvent(jobId, {
+        type: "adapter.selected",
+        data: { adapter: adapter.name, reason },
+      });
 
       // Worktree isolation for writes.
       let cwd = record.cwd;
@@ -248,12 +318,20 @@ export class JobManager {
         this.store.update(jobId, (r) => {
           r.worktree = wt;
         });
-        this.store.appendEvent(jobId, { type: "worktree.created", data: { path: wt.path, branch: wt.branch, baseRef: wt.baseRef } });
-      } else if (request.permissionProfile === "current-workspace-write" && git.dirty) {
+        this.store.appendEvent(jobId, {
+          type: "worktree.created",
+          data: { path: wt.path, branch: wt.branch, baseRef: wt.baseRef },
+        });
+      } else if (
+        request.permissionProfile === "current-workspace-write" &&
+        git.dirty
+      ) {
         this.store.appendEvent(jobId, {
           type: "worktree.skipped",
           level: "warn",
-          data: { note: "current-workspace-write explicitly selected; the developer's dirty working tree will be modified in place" },
+          data: {
+            note: "current-workspace-write explicitly selected; the developer's dirty working tree will be modified in place",
+          },
         });
       }
 
@@ -306,10 +384,17 @@ export class JobManager {
             : status === "timed-out"
               ? `job exceeded its ${record.timeoutMs ?? this.config.defaultTimeoutMs}ms timeout and was terminated.`
               : `job failed: ${be.message}`,
-        continuation: { supported: false, how: "see job events for progress before the failure" },
+        continuation: {
+          supported: false,
+          how: "see job events for progress before the failure",
+        },
         startedAt: record.startedAt ?? null,
         finishedAt: new Date().toISOString(),
-        failure: { code: be.code, message: be.message, retriable: be.retriable },
+        failure: {
+          code: be.code,
+          message: be.message,
+          retriable: be.retriable,
+        },
       };
       return await this.finalize(jobId, result, record.cwd);
     } finally {
@@ -322,10 +407,17 @@ export class JobManager {
   }
 
   /** Record final status, collect diffs/artifacts, persist the result. */
-  private async finalize(jobId: string, result: JobResult, originalCwd: string): Promise<JobResult> {
+  private async finalize(
+    jobId: string,
+    result: JobResult,
+    originalCwd: string,
+  ): Promise<JobResult> {
     const record = this.store.get(jobId);
     // Diff collection for write modes.
-    if (result.status === "completed" && record.permissionProfile !== "read-only") {
+    if (
+      result.status === "completed" &&
+      record.permissionProfile !== "read-only"
+    ) {
       try {
         if (record.worktree) {
           const summary = await collectWorktreeDiff(
@@ -333,22 +425,44 @@ export class JobManager {
             originalCwd,
             this.config.maxOutputBytes,
           );
-          result.diffStat = { filesChanged: summary.filesChanged, insertions: summary.insertions, deletions: summary.deletions };
+          result.diffStat = {
+            filesChanged: summary.filesChanged,
+            insertions: summary.insertions,
+            deletions: summary.deletions,
+          };
           result.changedFiles = summary.files;
           result.diffPatchPath = summary.patchPath;
           if (summary.patchPath) {
-            result.artifacts = [...(result.artifacts ?? []), { path: summary.patchPath, kind: "patch" }];
+            result.artifacts = [
+              ...(result.artifacts ?? []),
+              { path: summary.patchPath, kind: "patch" },
+            ];
           }
         } else {
-          const summary = await collectCurrentDiffSummary(originalCwd, null, this.config.maxOutputBytes);
-          result.diffStat = { filesChanged: summary.filesChanged, insertions: summary.insertions, deletions: summary.deletions };
+          const summary = await collectCurrentDiffSummary(
+            originalCwd,
+            null,
+            this.config.maxOutputBytes,
+          );
+          result.diffStat = {
+            filesChanged: summary.filesChanged,
+            insertions: summary.insertions,
+            deletions: summary.deletions,
+          };
           result.changedFiles = summary.files;
         }
       } catch (err) {
-        result.warnings = [...(result.warnings ?? []), `diff collection failed: ${asBridgeError(err).message}`];
+        result.warnings = [
+          ...(result.warnings ?? []),
+          `diff collection failed: ${asBridgeError(err).message}`,
+        ];
       }
     }
-    if (result.status === "completed" && record.permissionProfile === "read-only" && (result.changedFiles?.length ?? 0) > 0) {
+    if (
+      result.status === "completed" &&
+      record.permissionProfile === "read-only" &&
+      (result.changedFiles?.length ?? 0) > 0
+    ) {
       result.warnings = [
         ...(result.warnings ?? []),
         "read-only job reported changed files; verify unexpected modifications before continuing",
@@ -366,10 +480,18 @@ export class JobManager {
   }
 
   /** Cancel a job: abort its controller (kills the child process tree) and record the outcome. */
-  async cancel(jobId: string, reason = "cancelled by user"): Promise<JobResult> {
+  async cancel(
+    jobId: string,
+    reason = "cancelled by user",
+  ): Promise<JobResult> {
     const record = this.store.get(jobId);
-    if (["completed", "failed", "cancelled", "timed-out"].includes(record.status)) {
-      throw new BridgeError("JOB_ALREADY_TERMINAL", `job ${jobId} already finished as ${record.status}`);
+    if (
+      ["completed", "failed", "cancelled", "timed-out"].includes(record.status)
+    ) {
+      throw new BridgeError(
+        "JOB_ALREADY_TERMINAL",
+        `job ${jobId} already finished as ${record.status}`,
+      );
     }
     this.cancelReasons.set(jobId, reason);
     const abort = this.aborts.get(jobId);
@@ -381,7 +503,11 @@ export class JobManager {
         r.status = "cancelled";
         r.finishedAt = new Date().toISOString();
       });
-      this.store.appendEvent(jobId, { type: "job.cancelled", level: "warn", data: { reason } });
+      this.store.appendEvent(jobId, {
+        type: "job.cancelled",
+        level: "warn",
+        data: { reason },
+      });
     }
     const result: JobResult = {
       jobId,
@@ -408,21 +534,38 @@ export class JobManager {
   }
 
   /** Append a follow-up message; returns false when the adapter can't continue. */
-  async reply(jobId: string, message: string): Promise<{ accepted: boolean; note?: string }> {
+  async reply(
+    jobId: string,
+    message: string,
+  ): Promise<{ accepted: boolean; note?: string }> {
     const record = this.store.get(jobId);
     if (!record.nativeId) {
       this.store.update(jobId, (r) => {
         r.followUps = [
           ...(r.followUps ?? []),
-          { ts: new Date().toISOString(), message, accepted: false, note: "no native session id; follow-up impossible" },
+          {
+            ts: new Date().toISOString(),
+            message,
+            accepted: false,
+            note: "no native session id; follow-up impossible",
+          },
         ];
       });
-      return { accepted: false, note: "job has no native session id to continue" };
+      return {
+        accepted: false,
+        note: "job has no native session id to continue",
+      };
     }
     this.store.update(jobId, (r) => {
-      r.followUps = [...(r.followUps ?? []), { ts: new Date().toISOString(), message }];
+      r.followUps = [
+        ...(r.followUps ?? []),
+        { ts: new Date().toISOString(), message },
+      ];
     });
-    this.store.appendEvent(jobId, { type: "followup.requested", data: { nativeId: record.nativeId } });
+    this.store.appendEvent(jobId, {
+      type: "followup.requested",
+      data: { nativeId: record.nativeId },
+    });
     return { accepted: true };
   }
 
@@ -434,7 +577,11 @@ export class JobManager {
     return this.store.list();
   }
 
-  clean(opts?: { dryRun?: boolean }): { removed: string[]; completedRetentionDays: number; failedRetentionDays: number } {
+  clean(opts?: { dryRun?: boolean }): {
+    removed: string[];
+    completedRetentionDays: number;
+    failedRetentionDays: number;
+  } {
     return {
       removed: this.store.clean({
         completedRetentionDays: this.config.completedRetentionDays,
@@ -455,12 +602,16 @@ export class JobManager {
     return host === "cursor" ? "codex" : host === "codex" ? "cursor" : "codex";
   }
 
-  private profileForMode(mode: StartRequest["mode"]): StartRequest["permissionProfile"] {
+  private profileForMode(
+    mode: StartRequest["mode"],
+  ): StartRequest["permissionProfile"] {
     if (mode === "implement") return this.config.defaultImplementProfile;
     return this.config.defaultPermissionProfile;
   }
 
-  private pendingAdapterName(originHost: JobRecord["originHost"]): JobRecord["adapter"] {
+  private pendingAdapterName(
+    originHost: JobRecord["originHost"],
+  ): JobRecord["adapter"] {
     return originHost === "codex" ? "cursor-sdk" : "codex-app-server";
   }
 

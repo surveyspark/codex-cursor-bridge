@@ -24,16 +24,30 @@ afterAll(() => {
 });
 
 function makeManager(repoRoot: string, scratch: string) {
-  const fakeCodex = materializeFake(scratch, "fake-codex.cjs", fakeCodexAppServer({}));
+  const fakeCodex = materializeFake(
+    scratch,
+    "fake-codex.cjs",
+    fakeCodexAppServer({}),
+  );
   const fakeAcp = materializeFake(scratch, "fake-acp.cjs", fakeCursorAcp({}));
   return new JobManager({
     repoRoot,
     config: { worktreeRoot: path.join(scratch, "worktrees") },
     selectAdapter: async (_req, record) => {
       if (record.targetHost === "codex") {
-        return { adapter: new CodexAppServerAdapter({ argvOverride: [process.execPath, fakeCodex] }), reason: "fake" };
+        return {
+          adapter: new CodexAppServerAdapter({
+            argvOverride: [process.execPath, fakeCodex],
+          }),
+          reason: "fake",
+        };
       }
-      return { adapter: new CursorAcpAdapter({ argvOverride: [process.execPath, fakeAcp] }), reason: "fake" };
+      return {
+        adapter: new CursorAcpAdapter({
+          argvOverride: [process.execPath, fakeAcp],
+        }),
+        reason: "fake",
+      };
     },
   });
 }
@@ -47,7 +61,13 @@ describe("security: shell and injection safety", () => {
     const manager = makeManager(repo, scratch);
     const evil = "task'; rm -rf / # $(cat /etc/passwd) `whoami` && echo pwned";
     const enq = await manager.enqueue(
-      { task: evil, cwd: repo, mode: "investigate", permissionProfile: "read-only", background: false },
+      {
+        task: evil,
+        cwd: repo,
+        mode: "investigate",
+        permissionProfile: "read-only",
+        background: false,
+      },
       { host: "cursor", tool: "codex_start" },
     );
     const result = await manager.run(enq.jobId);
@@ -57,13 +77,25 @@ describe("security: shell and injection safety", () => {
 
   it("prompts forbid the opposite-host delegation tools", () => {
     const codexPrompt = buildTaskPrompt(
-      { task: "x", cwd: "/repo", mode: "investigate", permissionProfile: "read-only", background: false },
+      {
+        task: "x",
+        cwd: "/repo",
+        mode: "investigate",
+        permissionProfile: "read-only",
+        background: false,
+      },
       "codex",
     );
     expect(codexPrompt).toContain("Do NOT delegate it back to Cursor");
     expect(codexPrompt).toContain("cursor_start");
     const cursorPrompt = buildCursorTaskPrompt(
-      { task: "x", cwd: "/repo", mode: "implement", permissionProfile: "isolated-workspace-write", background: false },
+      {
+        task: "x",
+        cwd: "/repo",
+        mode: "implement",
+        permissionProfile: "isolated-workspace-write",
+        background: false,
+      },
       "cursor",
     );
     expect(cursorPrompt).toContain("Do NOT delegate it back to Codex");
@@ -142,7 +174,9 @@ describe("security: path containment", () => {
     const { canonicalize } = await import("../helpers.js");
     // macOS /private prefix: just assert the symlink resolves OUTSIDE the repo.
     const resolved = canonicalize(link);
-    expect(resolved.startsWith("/etc") || resolved.startsWith("/private/etc")).toBe(true);
+    expect(
+      resolved.startsWith("/etc") || resolved.startsWith("/private/etc"),
+    ).toBe(true);
     expect(resolved.startsWith(repo)).toBe(false);
   });
 });
@@ -158,7 +192,13 @@ describe("security: environment allowlisting", () => {
 
   it("prompt asks the agent to never echo secrets", () => {
     const p = buildTaskPrompt(
-      { task: "x", cwd: "/r", mode: "investigate", permissionProfile: "read-only", background: false },
+      {
+        task: "x",
+        cwd: "/r",
+        mode: "investigate",
+        permissionProfile: "read-only",
+        background: false,
+      },
       "codex",
     );
     expect(p).toContain("Never exfiltrate secrets");
@@ -169,7 +209,10 @@ describe("security: no listening ports by default", () => {
   it("MCP server runs stdio-only (no net server imported in serve path)", async () => {
     // Static guard: the MCP server source must not open listening sockets.
     const src = fs.readFileSync(
-      path.join(path.dirname(new URL(import.meta.url).pathname), "../../packages/mcp-server/src/serve.ts"),
+      path.join(
+        path.dirname(new URL(import.meta.url).pathname),
+        "../../packages/mcp-server/src/serve.ts",
+      ),
       "utf8",
     );
     expect(src).not.toMatch(/\.listen\s*\(/);
@@ -185,10 +228,17 @@ describe("security: process-tree cancellation", () => {
     const stubborn = path.join(dir, "stubborn.cjs");
     fs.writeFileSync(
       stubborn,
-      ["process.stdin.resume();", "setTimeout(() => process.exit(0), 60000);"].join("\n"),
+      [
+        "process.stdin.resume();",
+        "setTimeout(() => process.exit(0), 60000);",
+      ].join("\n"),
       { mode: 0o755 },
     );
-    const handle = spawnProcess({ cwd: dir, argv: [process.execPath, stubborn], env: buildChildEnv([]) });
+    const handle = spawnProcess({
+      cwd: dir,
+      argv: [process.execPath, stubborn],
+      env: buildChildEnv([]),
+    });
     const pid = handle.child.pid;
     expect(pid).toBeDefined();
     await handle.killTree();

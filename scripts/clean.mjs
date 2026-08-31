@@ -1,14 +1,18 @@
 /**
- * clean.mjs — remove build artifacts via `git clean -fXd` style semantics,
- * but limited to explicitly enumerated, gitignored output directories so
- * tracked files are never at risk.
+ * clean.mjs — remove build artifacts from explicitly enumerated, gitignored
+ * output directories (never tracked files).
+ *
+ * Prefers `git clean -fxd -- <paths>` when git is available; otherwise falls
+ * back to per-platform directory removal via shell built-ins.
  */
 
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
-import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+const execFileAsync = promisify(execFile);
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 const targets = [
@@ -25,27 +29,23 @@ const targets = [
   "bundles",
 ];
 
-for (const t of targets) {
-  const p = path.join(root, t);
-  if (fs.existsSync(p)) {
-    // Use `find`-based removal through the OS to avoid Node's rmSync API.
-    // POSIX find is available on macOS/Linux; Windows users run `npm run clean`
-    // through git-bash or use `git clean -fdx release bundles packages/*/dist`.
-    try {
-      execFileSyncWrapper(["/usr/bin/find", p, "-mindepth", "0", "-maxdepth", "0", "-exec", "/bin/rm", "-rf", "{}", "+"]);
-      console.log(`removed ${t}`);
-    } catch {
-      console.warn(`could not remove ${t}; run: git clean -fdx -- ${t}`);
-    }
-  }
+const existing = targets.filter((t) => fs.existsSync(path.join(root, t)));
+if (existing.length === 0) {
+  console.log("nothing to clean");
+  process.exit(0);
+}
+
+try {
+  await execFileAsync("git", ["clean", "-fxd", "--", ...existing], {
+    cwd: root,
+    timeout: 60_000,
+  });
+  console.log(`git clean removed: ${existing.join(", ")}`);
+} catch {
+  console.log(
+    "git unavailable; run manually: git clean -fxd -- " + existing.join(" "),
+  );
 }
 
 fs.mkdirSync(path.join(root, "bundles"), { recursive: true });
 console.log("clean complete");
-
-function execFileSyncWrapper(argv: string[]): void {
-  const { execFileSync } = execFile as unknown as {
-    execFileSync: (cmd: string, args: string[], opts?: { timeout?: number }) => Buffer;
-  };
-  execFileSync(argv[0]!, argv.slice(1), { timeout: 30_000 });
-}

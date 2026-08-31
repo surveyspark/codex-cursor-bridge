@@ -25,12 +25,20 @@ import {
   type StartRequest,
 } from "@codex-cursor-bridge/bridge-core";
 import { JobStore, newJobId } from "@codex-cursor-bridge/job-store";
-import { CodexAppServerAdapter, CodexExecAdapter } from "@codex-cursor-bridge/codex-adapter";
+import {
+  CodexAppServerAdapter,
+  CodexExecAdapter,
+} from "@codex-cursor-bridge/codex-adapter";
 import { selectCursorAdapter } from "@codex-cursor-bridge/cursor-adapter";
 import { JobManager } from "@codex-cursor-bridge/orchestrator";
 import { serveMcp } from "@codex-cursor-bridge/mcp-server";
 import { runDoctor } from "./doctor.js";
-import { jobsDir, stateRoot, defaultWorktreeRoot, BRIDGE_VERSION } from "./shared.js";
+import {
+  jobsDir,
+  stateRoot,
+  defaultWorktreeRoot,
+  BRIDGE_VERSION,
+} from "./shared.js";
 import { runDemos } from "./demos.js";
 
 interface ParsedArgs {
@@ -100,10 +108,17 @@ function die(err: unknown): never {
   process.exit(1);
 }
 
-async function makeManager(repoRoot: string, overrides: Record<string, unknown>, quiet = false): Promise<JobManager> {
+async function makeManager(
+  repoRoot: string,
+  overrides: Record<string, unknown>,
+  quiet = false,
+): Promise<JobManager> {
   const log = quiet
     ? getNullLogger()
-    : createLogger({ level: process.env.CCB_DEBUG ? "debug" : "info", filePath: `${stateRoot()}/logs/cli.log` });
+    : createLogger({
+        level: process.env.CCB_DEBUG ? "debug" : "info",
+        filePath: `${stateRoot()}/logs/cli.log`,
+      });
   return new JobManager({
     repoRoot,
     config: overrides as never,
@@ -111,20 +126,41 @@ async function makeManager(repoRoot: string, overrides: Record<string, unknown>,
     selectAdapter: async (_request, record) => {
       if (record.targetHost === "codex") {
         const ob = (overrides as { codexBinaryPath?: string }).codexBinaryPath;
-        const appServer = new CodexAppServerAdapter({ ...(ob ? { codexBinaryPath: ob } : {}) });
+        const appServer = new CodexAppServerAdapter({
+          ...(ob ? { codexBinaryPath: ob } : {}),
+        });
         const st = await appServer.isAvailable();
         if (st.available) {
           const probe = await appServer.probe();
-          if (probe.ok) return { adapter: appServer, reason: "codex app-server initialize succeeded" };
+          if (probe.ok)
+            return {
+              adapter: appServer,
+              reason: "codex app-server initialize succeeded",
+            };
         }
-        const fallback = new CodexExecAdapter({ ...(ob ? { codexBinaryPath: ob } : {}) });
+        const fallback = new CodexExecAdapter({
+          ...(ob ? { codexBinaryPath: ob } : {}),
+        });
         if ((await fallback.isAvailable()).available) {
-          return { adapter: fallback, reason: `codex exec fallback (app-server unavailable: ${st.reason ?? "probe failed"})` };
+          return {
+            adapter: fallback,
+            reason: `codex exec fallback (app-server unavailable: ${st.reason ?? "probe failed"})`,
+          };
         }
-        throw new BridgeError("ADAPTER_NOT_AVAILABLE", `no Codex adapter available (${st.reason ?? "probe failed"})`);
+        throw new BridgeError(
+          "ADAPTER_NOT_AVAILABLE",
+          `no Codex adapter available (${st.reason ?? "probe failed"})`,
+        );
       }
-      const { config } = await import("@codex-cursor-bridge/bridge-core").then((m) => m.loadConfig(repoRoot, overrides as never));
-      const selection = await selectCursorAdapter({ config, ...(config.cursorBinaryPath ? { cursorBinaryPath: config.cursorBinaryPath } : {}) });
+      const { config } = await import("@codex-cursor-bridge/bridge-core").then(
+        (m) => m.loadConfig(repoRoot, overrides as never),
+      );
+      const selection = await selectCursorAdapter({
+        config,
+        ...(config.cursorBinaryPath
+          ? { cursorBinaryPath: config.cursorBinaryPath }
+          : {}),
+      });
       return { adapter: selection.adapter, reason: selection.selectionReason };
     },
   });
@@ -157,7 +193,10 @@ async function main(argv: string[]): Promise<void> {
     case "mcp": {
       const host = String(flags.get("host") ?? "");
       if (host !== "cursor" && host !== "codex") {
-        throw new BridgeError("BRIDGE_USAGE", "mcp requires --host cursor|codex");
+        throw new BridgeError(
+          "BRIDGE_USAGE",
+          "mcp requires --host cursor|codex",
+        );
       }
       const repoRoot = findRepoRoot(flags.get("repo") as string | undefined);
       await serveMcp({ host, repoRoot });
@@ -170,8 +209,10 @@ async function main(argv: string[]): Promise<void> {
       const sub = positionals[1];
       const repoRoot = findRepoRoot(flags.get("repo") as string | undefined);
       const overrides: Record<string, unknown> = {};
-      if (flags.has("allow-noninteractive-cli")) overrides.allowNonInteractiveCliFallback = true;
-      if (flags.has("model")) overrides.defaultModel = String(flags.get("model"));
+      if (flags.has("allow-noninteractive-cli"))
+        overrides.allowNonInteractiveCliFallback = true;
+      if (flags.has("model"))
+        overrides.defaultModel = String(flags.get("model"));
       if (flags.has("debug")) overrides.debugLogging = true;
 
       if (!sub || sub === "list") {
@@ -182,12 +223,23 @@ async function main(argv: string[]): Promise<void> {
           .slice(-20)
           .reverse();
         if (flags.has("json")) {
-          printJson(jobs.map((j) => ({ jobId: j.jobId, status: j.status, mode: j.mode, adapter: j.adapter, nativeId: j.nativeId, createdAt: j.createdAt })));
+          printJson(
+            jobs.map((j) => ({
+              jobId: j.jobId,
+              status: j.status,
+              mode: j.mode,
+              adapter: j.adapter,
+              nativeId: j.nativeId,
+              createdAt: j.createdAt,
+            })),
+          );
         } else if (jobs.length === 0) {
           process.stdout.write("no jobs\n");
         } else {
           for (const j of jobs) {
-            process.stdout.write(`${j.jobId}  ${j.status.padEnd(10)} ${j.mode.padEnd(18)} ${j.adapter.padEnd(22)} ${j.nativeId ?? "-"}\n`);
+            process.stdout.write(
+              `${j.jobId}  ${j.status.padEnd(10)} ${j.mode.padEnd(18)} ${j.adapter.padEnd(22)} ${j.nativeId ?? "-"}\n`,
+            );
           }
         }
         return;
@@ -197,37 +249,76 @@ async function main(argv: string[]): Promise<void> {
         case "start": {
           const task = flags.get("task");
           if (typeof task !== "string" || task.length === 0) {
-            throw new BridgeError("BRIDGE_USAGE", "start requires --task \"<delegated task>\"");
+            throw new BridgeError(
+              "BRIDGE_USAGE",
+              'start requires --task "<delegated task>"',
+            );
           }
           const mode = String(flags.get("mode") ?? "investigate");
           const profileFlag = flags.get("profile");
           const request: StartRequest = {
             task,
-            cwd: findRepoRoot((flags.get("cwd") as string | undefined) ?? (flags.get("repo") as string | undefined)),
+            cwd: findRepoRoot(
+              (flags.get("cwd") as string | undefined) ??
+                (flags.get("repo") as string | undefined),
+            ),
             mode: mode as StartRequest["mode"],
-            permissionProfile: (typeof profileFlag === "string" ? profileFlag : undefined) as StartRequest["permissionProfile"],
+            permissionProfile: (typeof profileFlag === "string"
+              ? profileFlag
+              : undefined) as StartRequest["permissionProfile"],
             background: true,
-            ...(typeof flags.get("model") === "string" ? { model: flags.get("model") as string } : {}),
-            ...(typeof flags.get("effort") === "string" ? { reasoningEffort: flags.get("effort") as "low" | "medium" | "high" | "xhigh" } : {}),
-            ...(typeof flags.get("base-ref") === "string" ? { baseRef: flags.get("base-ref") as string } : {}),
-            ...(typeof flags.get("timeout") === "string" ? { timeoutMs: parseInt(flags.get("timeout") as string, 10) } : {}),
-            ...(typeof flags.get("constraints") === "string" ? { constraints: [flags.get("constraints") as string] } : {}),
-            ...(typeof flags.get("expected-output") === "string" ? { expectedOutput: flags.get("expected-output") as string } : {}),
+            ...(typeof flags.get("model") === "string"
+              ? { model: flags.get("model") as string }
+              : {}),
+            ...(typeof flags.get("effort") === "string"
+              ? {
+                  reasoningEffort: flags.get("effort") as
+                    | "low"
+                    | "medium"
+                    | "high"
+                    | "xhigh",
+                }
+              : {}),
+            ...(typeof flags.get("base-ref") === "string"
+              ? { baseRef: flags.get("base-ref") as string }
+              : {}),
+            ...(typeof flags.get("timeout") === "string"
+              ? { timeoutMs: parseInt(flags.get("timeout") as string, 10) }
+              : {}),
+            ...(typeof flags.get("constraints") === "string"
+              ? { constraints: [flags.get("constraints") as string] }
+              : {}),
+            ...(typeof flags.get("expected-output") === "string"
+              ? { expectedOutput: flags.get("expected-output") as string }
+              : {}),
             origin: { host: "cli", handoffDepth: 0, maxHandoffDepth: 1 },
           };
           const vr = validateStartRequest(request);
           if (!vr.ok) {
-            throw new BridgeError("BRIDGE_USAGE", `invalid start arguments: ${vr.issues.map((i) => `${i.path}: ${i.message}`).join("; ")}`);
+            throw new BridgeError(
+              "BRIDGE_USAGE",
+              `invalid start arguments: ${vr.issues.map((i) => `${i.path}: ${i.message}`).join("; ")}`,
+            );
           }
           const manager = await makeManager(repoRoot, overrides);
-          const enq = await manager.enqueue(vr.value as StartRequest, { host: "cli", tool: "cli", client: "terminal" });
+          const enq = await manager.enqueue(vr.value as StartRequest, {
+            host: "cli",
+            tool: "cli",
+            client: "terminal",
+          });
           process.stdout.write(`job ${enq.jobId} queued (${host})\n`);
           const result = await manager.run(enq.jobId);
           if (flags.has("json")) {
-            printJson({ jobId: result.jobId, nativeId: result.nativeId, status: result.status, result });
+            printJson({
+              jobId: result.jobId,
+              nativeId: result.nativeId,
+              status: result.status,
+              result,
+            });
           } else {
             process.stdout.write(`status: ${result.status}\n`);
-            if (result.nativeId) process.stdout.write(`native id: ${result.nativeId}\n`);
+            if (result.nativeId)
+              process.stdout.write(`native id: ${result.nativeId}\n`);
             process.stdout.write(`\n${result.summary}\n`);
           }
           process.exitCode = result.status === "completed" ? 0 : 1;
@@ -235,36 +326,60 @@ async function main(argv: string[]): Promise<void> {
         }
         case "status": {
           const jobId = positionals[2];
-          if (!jobId) throw new BridgeError("BRIDGE_USAGE", "status requires <jobId>");
+          if (!jobId)
+            throw new BridgeError("BRIDGE_USAGE", "status requires <jobId>");
           const manager = await makeManager(repoRoot, overrides);
           const record = manager.get(jobId);
           if (flags.has("json")) {
-            printJson({ jobId: record.jobId, status: record.status, adapter: record.adapter, nativeId: record.nativeId, worktree: record.worktree ?? null, recentEvents: record.events.slice(-10) });
+            printJson({
+              jobId: record.jobId,
+              status: record.status,
+              adapter: record.adapter,
+              nativeId: record.nativeId,
+              worktree: record.worktree ?? null,
+              recentEvents: record.events.slice(-10),
+            });
           } else {
-            process.stdout.write(`job ${record.jobId}\nstatus: ${record.status}\nadapter: ${record.adapter}\nnative id: ${record.nativeId ?? "-"}\n`);
-            if (record.worktree) process.stdout.write(`worktree: ${record.worktree.path} (branch ${record.worktree.branch})\n`);
+            process.stdout.write(
+              `job ${record.jobId}\nstatus: ${record.status}\nadapter: ${record.adapter}\nnative id: ${record.nativeId ?? "-"}\n`,
+            );
+            if (record.worktree)
+              process.stdout.write(
+                `worktree: ${record.worktree.path} (branch ${record.worktree.branch})\n`,
+              );
             process.stdout.write(`events:\n`);
-            for (const e of record.events.slice(-10)) process.stdout.write(`  ${e.ts} ${e.type}\n`);
+            for (const e of record.events.slice(-10))
+              process.stdout.write(`  ${e.ts} ${e.type}\n`);
           }
           return;
         }
         case "result": {
           const jobId = positionals[2];
-          if (!jobId) throw new BridgeError("BRIDGE_USAGE", "result requires <jobId>");
+          if (!jobId)
+            throw new BridgeError("BRIDGE_USAGE", "result requires <jobId>");
           const manager = await makeManager(repoRoot, overrides);
           const record = manager.get(jobId);
           if (flags.has("json")) {
-            printJson({ jobId: record.jobId, status: record.status, nativeId: record.nativeId, result: record.result });
+            printJson({
+              jobId: record.jobId,
+              status: record.status,
+              nativeId: record.nativeId,
+              result: record.result,
+            });
           } else if (record.result) {
             process.stdout.write(`${record.result.summary}\n`);
             if (record.result.changedFiles?.length) {
               process.stdout.write(`\nchanged files:\n`);
-              for (const f of record.result.changedFiles) process.stdout.write(`  ${f.change.padEnd(8)} ${f.path}\n`);
+              for (const f of record.result.changedFiles)
+                process.stdout.write(`  ${f.change.padEnd(8)} ${f.path}\n`);
             }
             if (record.result.diffStat) {
-              process.stdout.write(`\ndiff: ${record.result.diffStat.filesChanged} file(s), +${record.result.diffStat.insertions} -${record.result.diffStat.deletions}\n`);
+              process.stdout.write(
+                `\ndiff: ${record.result.diffStat.filesChanged} file(s), +${record.result.diffStat.insertions} -${record.result.diffStat.deletions}\n`,
+              );
             }
-            if (record.result.diffPatchPath) process.stdout.write(`patch: ${record.result.diffPatchPath}\n`);
+            if (record.result.diffPatchPath)
+              process.stdout.write(`patch: ${record.result.diffPatchPath}\n`);
           } else {
             process.stdout.write(`no result yet (status ${record.status})\n`);
             process.exitCode = 2;
@@ -274,25 +389,45 @@ async function main(argv: string[]): Promise<void> {
         case "reply": {
           const jobId = positionals[2];
           const message = positionals.slice(3).join(" ");
-          if (!jobId || !message) throw new BridgeError("BRIDGE_USAGE", "reply requires <jobId> <message>");
+          if (!jobId || !message)
+            throw new BridgeError(
+              "BRIDGE_USAGE",
+              "reply requires <jobId> <message>",
+            );
           const manager = await makeManager(repoRoot, overrides);
           const record = manager.get(jobId);
-          if (!record.nativeId) throw new BridgeError("BRIDGE_NOT_SUPPORTED", `job ${jobId} has no native session id`);
-          process.stdout.write(`sending follow-up to native session ${record.nativeId}...\n`);
-          const result = await managerFollowUp(host, record.nativeId, message, repoRoot, overrides);
+          if (!record.nativeId)
+            throw new BridgeError(
+              "BRIDGE_NOT_SUPPORTED",
+              `job ${jobId} has no native session id`,
+            );
+          process.stdout.write(
+            `sending follow-up to native session ${record.nativeId}...\n`,
+          );
+          const result = await managerFollowUp(
+            host,
+            record.nativeId,
+            message,
+            repoRoot,
+            overrides,
+          );
           process.stdout.write(`${result.summary}\n`);
           return;
         }
         case "cancel": {
           const jobId = positionals[2];
-          if (!jobId) throw new BridgeError("BRIDGE_USAGE", "cancel requires <jobId>");
+          if (!jobId)
+            throw new BridgeError("BRIDGE_USAGE", "cancel requires <jobId>");
           const manager = await makeManager(repoRoot, overrides, true);
           const result = await manager.cancel(jobId, "cancelled via CLI");
           process.stdout.write(`job ${result.jobId} cancelled\n`);
           return;
         }
         default:
-          throw new BridgeError("BRIDGE_USAGE", `unknown ${command} subcommand: ${sub}`);
+          throw new BridgeError(
+            "BRIDGE_USAGE",
+            `unknown ${command} subcommand: ${sub}`,
+          );
       }
     }
 
@@ -301,11 +436,21 @@ async function main(argv: string[]): Promise<void> {
       const store = new JobStore({ jobsDir: jobsDir() });
       if (sub === "list") {
         const jobs = store.list().slice(-30).reverse();
-        if (flags.has("json")) printJson(jobs.map((j) => ({ jobId: j.jobId, status: j.status, adapter: j.adapter, nativeId: j.nativeId })));
+        if (flags.has("json"))
+          printJson(
+            jobs.map((j) => ({
+              jobId: j.jobId,
+              status: j.status,
+              adapter: j.adapter,
+              nativeId: j.nativeId,
+            })),
+          );
         else if (jobs.length === 0) process.stdout.write("no jobs\n");
         else
           for (const j of jobs)
-            process.stdout.write(`${j.jobId}  ${j.status.padEnd(10)} ${j.originHost}->${j.targetHost}  ${j.adapter.padEnd(22)} ${j.nativeId ?? "-"}\n`);
+            process.stdout.write(
+              `${j.jobId}  ${j.status.padEnd(10)} ${j.originHost}->${j.targetHost}  ${j.adapter.padEnd(22)} ${j.nativeId ?? "-"}\n`,
+            );
         return;
       }
       if (sub === "clean") {
@@ -316,8 +461,12 @@ async function main(argv: string[]): Promise<void> {
           failedRetentionDays: 14,
           ...(dryRun ? { dryRun: true } : {}),
         });
-        if (flags.has("json")) printJson({ removed, dryRun: flags.has("dry-run") });
-        else process.stdout.write(`${flags.has("dry-run") ? "would remove" : "removed"} ${removed.length} job(s)\n`);
+        if (flags.has("json"))
+          printJson({ removed, dryRun: flags.has("dry-run") });
+        else
+          process.stdout.write(
+            `${flags.has("dry-run") ? "would remove" : "removed"} ${removed.length} job(s)\n`,
+          );
         return;
       }
       if (sub === "recover") {
@@ -331,16 +480,29 @@ async function main(argv: string[]): Promise<void> {
 
     case "config": {
       const sub = positionals[1] ?? "show";
-      if (sub !== "show") throw new BridgeError("BRIDGE_USAGE", "config supports only 'show'");
+      if (sub !== "show")
+        throw new BridgeError("BRIDGE_USAGE", "config supports only 'show'");
       const repoRoot = findRepoRoot(flags.get("repo") as string | undefined);
-      const { loadConfig: lc, redactedConfig: rc } = await import("@codex-cursor-bridge/bridge-core");
+      const { loadConfig: lc, redactedConfig: rc } =
+        await import("@codex-cursor-bridge/bridge-core");
       const loaded = lc(repoRoot, undefined);
       if (flags.has("json")) {
-        printJson({ config: rc(loaded.config), sources: loaded.sources, stateRoot: stateRoot(), worktreeRoot: defaultWorktreeRoot() });
+        printJson({
+          config: rc(loaded.config),
+          sources: loaded.sources,
+          stateRoot: stateRoot(),
+          worktreeRoot: defaultWorktreeRoot(),
+        });
       } else {
-        process.stdout.write(`effective configuration (secrets redacted; none stored by design)\n`);
-        process.stdout.write(`user config:    ${loaded.sources.user ?? "(none)"}\n`);
-        process.stdout.write(`project config: ${loaded.sources.project ?? "(none)"}\n`);
+        process.stdout.write(
+          `effective configuration (secrets redacted; none stored by design)\n`,
+        );
+        process.stdout.write(
+          `user config:    ${loaded.sources.user ?? "(none)"}\n`,
+        );
+        process.stdout.write(
+          `project config: ${loaded.sources.project ?? "(none)"}\n`,
+        );
         process.stdout.write(`state dir:      ${stateRoot()}\n`);
         process.stdout.write(JSON.stringify(rc(loaded.config), null, 2) + "\n");
       }
@@ -349,7 +511,10 @@ async function main(argv: string[]): Promise<void> {
 
     case "demos": {
       const repoRoot = findRepoRoot(flags.get("repo") as string | undefined);
-      await runDemos(positionals.slice(1), { repoRoot, json: flags.has("json") });
+      await runDemos(positionals.slice(1), {
+        repoRoot,
+        json: flags.has("json"),
+      });
       return;
     }
 
@@ -388,12 +553,22 @@ async function managerFollowUp(
     background: false,
     origin: { host: "cli", handoffDepth: 0, maxHandoffDepth: 1 },
   };
-  const enq = await manager.enqueue(request, { host: "cli", tool: "cli reply", client: "terminal" });
+  const enq = await manager.enqueue(request, {
+    host: "cli",
+    tool: "cli reply",
+    client: "terminal",
+  });
   const result = await manager.run(enq.jobId);
-  return { summary: `${result.status}: ${result.summary}`, jobId: result.jobId, nativeId: result.nativeId };
+  return {
+    summary: `${result.status}: ${result.summary}`,
+    jobId: result.jobId,
+    nativeId: result.nativeId,
+  };
 }
 
-const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1]!.split("/").pop() ?? "\u0000");
+const isMain =
+  process.argv[1] &&
+  import.meta.url.endsWith(process.argv[1]!.split("/").pop() ?? "\u0000");
 if (isMain) {
   main(process.argv.slice(2)).catch((err) => die(err));
 }

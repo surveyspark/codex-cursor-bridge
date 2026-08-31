@@ -30,13 +30,19 @@ export async function makeTempRepo(
 ): Promise<{ root: string; repo: string; cleanup: () => void }> {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-test-repo-"));
   const run = async (args: string[]): Promise<void> => {
-    await execFileAsync("git", args, { cwd: root, env: GIT_ENV(), timeout: 30_000 });
+    await execFileAsync("git", args, {
+      cwd: root,
+      env: GIT_ENV(),
+      timeout: 30_000,
+    });
   };
   await run(["init", "--initial-branch=main", "."]);
   await run(["config", "user.name", "bridge-test"]);
   await run(["config", "user.email", "test@example.invalid"]);
   fs.writeFileSync(path.join(root, ".gitignore"), ".state/\n.handoff/\n");
-  for (const [rel, content] of Object.entries(opts.files ?? { "src/index.ts": "export const x = 1;\n" })) {
+  for (const [rel, content] of Object.entries(
+    opts.files ?? { "src/index.ts": "export const x = 1;\n" },
+  )) {
     const file = path.join(root, rel);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, content);
@@ -156,14 +162,22 @@ setTimeout(() => process.exit(0), 120000);
 }
 
 /** Materialize a fake agent script to a temp file and clean up with the repo. */
-export function materializeFake(dir: string, name: string, script: string): string {
+export function materializeFake(
+  dir: string,
+  name: string,
+  script: string,
+): string {
   const file = path.join(dir, name);
   fs.writeFileSync(file, script, { mode: 0o755 });
   return file;
 }
 
 /** Wait until a condition or timeout; avoids sleep-polling in tests where possible. */
-export async function waitFor(pred: () => boolean, timeoutMs = 5000, stepMs = 25): Promise<void> {
+export async function waitFor(
+  pred: () => boolean,
+  timeoutMs = 5000,
+  stepMs = 25,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (pred()) return;

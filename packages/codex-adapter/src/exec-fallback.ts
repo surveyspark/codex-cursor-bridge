@@ -21,7 +21,12 @@ import {
 } from "@codex-cursor-bridge/bridge-core";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { AdapterAvailability, AdapterCapabilities, AdapterRunContext, AgentAdapter } from "./types.js";
+import type {
+  AdapterAvailability,
+  AdapterCapabilities,
+  AdapterRunContext,
+  AgentAdapter,
+} from "./types.js";
 import { mapProfileToSandbox } from "./sandbox.js";
 import { buildTaskPrompt } from "./prompt.js";
 import { extractChangedFiles, extractTests } from "./normalize.js";
@@ -59,7 +64,9 @@ export class CodexExecAdapter implements AgentAdapter {
 
   async isAvailable(): Promise<AdapterAvailability> {
     try {
-      const { stdout } = await execFileAsync(this.binary(), ["--version"], { timeout: 10_000 });
+      const { stdout } = await execFileAsync(this.binary(), ["--version"], {
+        timeout: 10_000,
+      });
       return { available: true, version: stdout.trim() };
     } catch {
       return { available: false, reason: "codex CLI not found" };
@@ -72,14 +79,29 @@ export class CodexExecAdapter implements AgentAdapter {
       continuation: false,
       structuredEvents: true,
       approvals: "auto-denied",
-      sandboxProfiles: ["read-only", "isolated-workspace-write", "current-workspace-write"],
-      modes: ["investigate", "review", "adversarial-review", "rescue", "plan", "implement"],
+      sandboxProfiles: [
+        "read-only",
+        "isolated-workspace-write",
+        "current-workspace-write",
+      ],
+      modes: [
+        "investigate",
+        "review",
+        "adversarial-review",
+        "rescue",
+        "plan",
+        "implement",
+      ],
     };
   }
 
   async run(request: StartRequest, ctx: AdapterRunContext): Promise<JobResult> {
     const startedAt = new Date().toISOString();
-    const sandbox = mapProfileToSandbox(request.permissionProfile, ctx.cwd, ctx.networkPolicy);
+    const sandbox = mapProfileToSandbox(
+      request.permissionProfile,
+      ctx.cwd,
+      ctx.networkPolicy,
+    );
     const argv = [
       this.binary(),
       ...this.execArgs(),
@@ -108,7 +130,10 @@ export class CodexExecAdapter implements AgentAdapter {
       const ev = parsed as ExecEvent;
       events.push(ev);
       const msgType = ev.msg?.type;
-      if (msgType === "agent_message" && typeof (ev.msg!.payload as { message?: unknown })?.message === "string") {
+      if (
+        msgType === "agent_message" &&
+        typeof (ev.msg!.payload as { message?: unknown })?.message === "string"
+      ) {
         lastAgentMessage = (ev.msg!.payload as { message: string }).message;
       } else if (msgType === "thread_started") {
         const payload = ev.msg!.payload as { thread_id?: string };
@@ -131,7 +156,11 @@ export class CodexExecAdapter implements AgentAdapter {
       stdinData: buildTaskPrompt(request, "codex"),
       onStdoutLine: handleLine,
       onStderrLine: (line) => {
-        ctx.emit({ type: "codex-exec.stderr", level: "debug", data: { line: redactString(line) } });
+        ctx.emit({
+          type: "codex-exec.stderr",
+          level: "debug",
+          data: { line: redactString(line) },
+        });
       },
       abortSignal: ctx.abortSignal,
     });
@@ -146,7 +175,10 @@ export class CodexExecAdapter implements AgentAdapter {
         adapter: this.name,
         status: ctx.abortSignal.aborted ? "cancelled" : "timed-out",
         summary: "codex exec run was cancelled/timed out before completion.",
-        continuation: { supported: false, how: "one-shot fallback: no live thread continuation" },
+        continuation: {
+          supported: false,
+          how: "one-shot fallback: no live thread continuation",
+        },
         startedAt,
         finishedAt,
         failure: { code: "JOB_CANCELLED", message: "aborted", retriable: true },
@@ -160,23 +192,45 @@ export class CodexExecAdapter implements AgentAdapter {
         adapter: this.name,
         status: "failed",
         summary: `codex exec exited with code ${exit.code}.`,
-        continuation: { supported: false, how: "one-shot fallback: no live thread continuation" },
+        continuation: {
+          supported: false,
+          how: "one-shot fallback: no live thread continuation",
+        },
         startedAt,
         finishedAt,
-        failure: { code: "CHILD_EXITED", message: `exit code ${exit.code}`, retriable: exit.code !== 2 },
+        failure: {
+          code: "CHILD_EXITED",
+          message: `exit code ${exit.code}`,
+          retriable: exit.code !== 2,
+        },
       };
     }
 
     const commands = events
-      .filter((e) => e.msg?.type === "exec_command_end" || e.msg?.type === "exec_command_begin")
+      .filter(
+        (e) =>
+          e.msg?.type === "exec_command_end" ||
+          e.msg?.type === "exec_command_begin",
+      )
       .map((e) => {
-        const payload = e.msg!.payload as { command?: unknown; exit_code?: unknown };
-        const commandStr = Array.isArray(payload.command) ? (payload.command as string[]).join(" ") : String(payload.command ?? "");
-        const exitCode = typeof payload.exit_code === "number" ? payload.exit_code : null;
+        const payload = e.msg!.payload as {
+          command?: unknown;
+          exit_code?: unknown;
+        };
+        const commandStr = Array.isArray(payload.command)
+          ? (payload.command as string[]).join(" ")
+          : String(payload.command ?? "");
+        const exitCode =
+          typeof payload.exit_code === "number" ? payload.exit_code : null;
         return {
           command: commandStr,
           exitCode,
-          aggregatedStatus: exitCode === null ? ("unknown" as const) : exitCode === 0 ? ("success" as const) : ("failure" as const),
+          aggregatedStatus:
+            exitCode === null
+              ? ("unknown" as const)
+              : exitCode === 0
+                ? ("success" as const)
+                : ("failure" as const),
         };
       })
       .slice(0, 200);
@@ -184,7 +238,13 @@ export class CodexExecAdapter implements AgentAdapter {
     const changed = extractChangedFiles(
       events
         .filter((e) => e.msg?.type === "patch_apply_end")
-        .map((e) => ({ item: { type: "fileChange", changes: (e.msg!.payload as { changes?: unknown }).changes ?? [] }, kind: "fileChange" })),
+        .map((e) => ({
+          item: {
+            type: "fileChange",
+            changes: (e.msg!.payload as { changes?: unknown }).changes ?? [],
+          },
+          kind: "fileChange",
+        })),
     );
 
     const tests = extractTests(commands);
@@ -193,7 +253,9 @@ export class CodexExecAdapter implements AgentAdapter {
       nativeId: threadId,
       adapter: this.name,
       status: "completed",
-      summary: (lastAgentMessage ?? "(codex exec returned no final message)").slice(0, 10_000),
+      summary: (
+        lastAgentMessage ?? "(codex exec returned no final message)"
+      ).slice(0, 10_000),
       continuation: {
         supported: false,
         how: threadId

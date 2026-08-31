@@ -6,15 +6,22 @@
 import type { StartRequest } from "@codex-cursor-bridge/bridge-core";
 
 const MODE_GUIDANCE: Record<StartRequest["mode"], string> = {
-  investigate: "Mode: INVESTIGATE (read-only intent). Do not modify files unless the task explicitly requires it.",
+  investigate:
+    "Mode: INVESTIGATE (read-only intent). Do not modify files unless the task explicitly requires it.",
   review: "Mode: REVIEW (read-only intent). Do not modify files.",
-  "adversarial-review": "Mode: ADVERSARIAL REVIEW (read-only intent). Do not modify files.",
-  rescue: "Mode: RESCUE. Diagnose prior failures and state the least-risky path forward before editing.",
+  "adversarial-review":
+    "Mode: ADVERSARIAL REVIEW (read-only intent). Do not modify files.",
+  rescue:
+    "Mode: RESCUE. Diagnose prior failures and state the least-risky path forward before editing.",
   plan: "Mode: PLAN (read-only intent). Produce a plan; do not modify files.",
-  implement: "Mode: IMPLEMENT. Make the requested changes, run relevant tests, and report exactly what changed.",
+  implement:
+    "Mode: IMPLEMENT. Make the requested changes, run relevant tests, and report exactly what changed.",
 };
 
-export function buildTaskPrompt(request: StartRequest, targetHost: "cursor"): string {
+export function buildTaskPrompt(
+  request: StartRequest,
+  targetHost: "cursor",
+): string {
   const parts: string[] = [];
   parts.push(`# Delegated task (${request.mode})`);
   parts.push(MODE_GUIDANCE[request.mode] ?? "Mode: " + request.mode);

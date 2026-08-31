@@ -72,7 +72,11 @@
             "pattern": "^step-[0-9]+$",
             "maxLength": 32
           },
-          "description": { "type": "string", "minLength": 1, "maxLength": 5000 },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000
+          },
           "rationale": { "type": "string", "minLength": 1, "maxLength": 5000 },
           "likelyFiles": {
             "type": "array",

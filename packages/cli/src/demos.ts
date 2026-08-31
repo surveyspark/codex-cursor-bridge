@@ -34,7 +34,10 @@ import {
 
 const execFileAsync = promisify(execFile);
 
-const FIXTURES = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../../../tests/fixtures");
+const FIXTURES = path.resolve(
+  path.dirname(new URL(import.meta.url).pathname),
+  "../../../../tests/fixtures",
+);
 void FIXTURES;
 
 export const DEMOS = [
@@ -45,11 +48,18 @@ export const DEMOS = [
   "cancel-kills-tree",
 ] as const;
 
-export async function runDemos(args: string[], ctx: { repoRoot: string; json?: boolean }): Promise<void> {
+export async function runDemos(
+  args: string[],
+  ctx: { repoRoot: string; json?: boolean },
+): Promise<void> {
   const sub = args[0] ?? "list";
   if (sub === "list") {
     process.stdout.write(
-      ["Reproducible demos (fake agents; no credentials needed):", ...DEMOS.map((d) => `  codex-cursor-bridge demos run ${d}`), ""].join("\n"),
+      [
+        "Reproducible demos (fake agents; no credentials needed):",
+        ...DEMOS.map((d) => `  codex-cursor-bridge demos run ${d}`),
+        "",
+      ].join("\n"),
     );
     return;
   }
@@ -60,7 +70,9 @@ export async function runDemos(args: string[], ctx: { repoRoot: string; json?: b
   }
   const name = args[1];
   if (!name || !DEMOS.includes(name as (typeof DEMOS)[number])) {
-    process.stderr.write(`unknown demo ${String(name)}; choose one of: ${DEMOS.join(", ")}\n`);
+    process.stderr.write(
+      `unknown demo ${String(name)}; choose one of: ${DEMOS.join(", ")}\n`,
+    );
     process.exitCode = 1;
     return;
   }
@@ -165,7 +177,11 @@ setTimeout(() => process.exit(0), 60000);
 `;
 }
 
-async function materializeFake(dir: string, name: string, script: string): Promise<string> {
+async function materializeFake(
+  dir: string,
+  name: string,
+  script: string,
+): Promise<string> {
   const file = path.join(dir, name);
   fs.writeFileSync(file, script, { mode: 0o755 });
   return file;
@@ -177,16 +193,31 @@ function managerWithFakes(
   log: ReturnType<typeof createLogger>,
   overrides?: { codex?: InstanceType<typeof CodexAppServerAdapter> },
 ): Promise<JobManager> {
-  const fakeCodexP = materializeFake(scratch, "fake-codex-app-server.cjs", fakeCodexAppServerScript());
-  const fakeAcpP = materializeFake(scratch, "fake-cursor-acp.cjs", fakeCursorAcpScript());
+  const fakeCodexP = materializeFake(
+    scratch,
+    "fake-codex-app-server.cjs",
+    fakeCodexAppServerScript(),
+  );
+  const fakeAcpP = materializeFake(
+    scratch,
+    "fake-cursor-acp.cjs",
+    fakeCursorAcpScript(),
+  );
   return Promise.all([fakeCodexP, fakeAcpP]).then(([fakeCodex, fakeAcp]) => {
     return new JobManager({
       repoRoot,
-      config: { worktreeRoot: path.join(scratch, "worktrees"), debugLogging: true },
+      config: {
+        worktreeRoot: path.join(scratch, "worktrees"),
+        debugLogging: true,
+      },
       logger: log,
       selectAdapter: async (_request, record) => {
         if (record.targetHost === "codex") {
-          if (overrides?.codex) return { adapter: overrides.codex, reason: "fake app-server (override) for demo" };
+          if (overrides?.codex)
+            return {
+              adapter: overrides.codex,
+              reason: "fake app-server (override) for demo",
+            };
           return {
             adapter: new CodexAppServerAdapter({
               argvOverride: [process.execPath, fakeCodex],
@@ -196,7 +227,9 @@ function managerWithFakes(
           };
         }
         return {
-          adapter: new CursorAcpAdapter({ argvOverride: [process.execPath, fakeAcp] }),
+          adapter: new CursorAcpAdapter({
+            argvOverride: [process.execPath, fakeAcp],
+          }),
           reason: "fake ACP for demo",
         };
       },
@@ -206,7 +239,11 @@ function managerWithFakes(
 
 /* ---------------- demos ---------------- */
 
-async function demo1(scratch: string, ctx: { repoRoot: string }, log: ReturnType<typeof createLogger>): Promise<void> {
+async function demo1(
+  scratch: string,
+  ctx: { repoRoot: string },
+  log: ReturnType<typeof createLogger>,
+): Promise<void> {
   const manager = await managerWithFakes(ctx.repoRoot, scratch, log);
   const request: StartRequest = {
     task: "Investigate why the login flow fails when the session cookie expires mid-request. Trace the failure through the middleware and report the root cause.",
@@ -216,29 +253,43 @@ async function demo1(scratch: string, ctx: { repoRoot: string }, log: ReturnType
     background: false,
     origin: { host: "cursor", handoffDepth: 0, maxHandoffDepth: 1 },
   };
-  const enq = await manager.enqueue(request, { host: "cursor", tool: "codex_start", client: "demo" });
+  const enq = await manager.enqueue(request, {
+    host: "cursor",
+    tool: "codex_start",
+    client: "demo",
+  });
   const result = await manager.run(enq.jobId);
   report("demo1 delegate-investigate", {
     jobId: result.jobId,
     status: result.status,
-    nativeThreadPreserved: Boolean(result.nativeId && result.nativeId.startsWith("thr-fake-")),
+    nativeThreadPreserved: Boolean(
+      result.nativeId && result.nativeId.startsWith("thr-fake-"),
+    ),
     summaryPreview: result.summary.slice(0, 120),
   });
 }
 
-async function demo2(scratch: string, ctx: { repoRoot: string }, log: ReturnType<typeof createLogger>): Promise<void> {
+async function demo2(
+  scratch: string,
+  ctx: { repoRoot: string },
+  log: ReturnType<typeof createLogger>,
+): Promise<void> {
   const manager = await managerWithFakes(ctx.repoRoot, scratch, log);
   const plan = {
     schemaVersion: "1.0",
     task: "Add a retry wrapper around fetchUser() with exponential backoff.",
     goal: "Reduce transient login failures.",
     observedRepositoryFacts: [
-      { fact: "fetchUser is called in three places without retry", evidence: ["src/api/user.ts:42", "grep -rn 'fetchUser(' src"] },
+      {
+        fact: "fetchUser is called in three places without retry",
+        evidence: ["src/api/user.ts:42", "grep -rn 'fetchUser(' src"],
+      },
     ],
     implementationSteps: [
       {
         id: "step-1",
-        description: "Add withRetry(fn, attempts) helper and wrap fetchUser call sites.",
+        description:
+          "Add withRetry(fn, attempts) helper and wrap fetchUser call sites.",
         rationale: "Centralizes retry policy.",
         likelyFiles: ["src/api/user.ts"],
         dependsOn: [],
@@ -256,31 +307,69 @@ async function demo2(scratch: string, ctx: { repoRoot: string }, log: ReturnType
     permissionProfile: "isolated-workspace-write",
     background: false,
     origin: { host: "codex", handoffDepth: 0, maxHandoffDepth: 1 },
-    constraints: ["only modify files matching allowedPaths", "report deviations"],
+    constraints: [
+      "only modify files matching allowedPaths",
+      "report deviations",
+    ],
   };
-  const enq = await manager.enqueue(request, { host: "codex", tool: "cursor_start", client: "demo" });
+  const enq = await manager.enqueue(request, {
+    host: "codex",
+    tool: "cursor_start",
+    client: "demo",
+  });
   const result = await manager.run(enq.jobId);
   report("demo2 plan-and-execute", {
     jobId: result.jobId,
     status: result.status,
-    nativeSessionPreserved: Boolean(result.nativeId && result.nativeId.startsWith("sess-fake-")),
+    nativeSessionPreserved: Boolean(
+      result.nativeId && result.nativeId.startsWith("sess-fake-"),
+    ),
     summaryPreview: result.summary.slice(0, 120),
   });
 }
 
-async function demo3(scratch: string, ctx: { repoRoot: string }, _log: ReturnType<typeof createLogger>): Promise<void> {
+async function demo3(
+  scratch: string,
+  ctx: { repoRoot: string },
+  _log: ReturnType<typeof createLogger>,
+): Promise<void> {
   // Worktree isolation: create, modify a sample file, run a "test", diff.
   const info = await inspectGit(ctx.repoRoot);
   if (!info.isGit || !info.hasCommits) {
-    report("demo3 worktree-isolation", { skipped: "requires a git repository with at least one commit" });
+    report("demo3 worktree-isolation", {
+      skipped: "requires a git repository with at least one commit",
+    });
     return;
   }
-  const wt = await createWorktree({ repoRoot: ctx.repoRoot, worktreeRoot: path.join(scratch, "worktrees"), jobId: "job_demo3aaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
+  const wt = await createWorktree({
+    repoRoot: ctx.repoRoot,
+    worktreeRoot: path.join(scratch, "worktrees"),
+    jobId: "job_demo3aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  });
   const sample = path.join(wt.path, "bridge-demo-sample.txt");
-  fs.writeFileSync(sample, "demo change from isolated worktree\n", { mode: 0o600 });
+  fs.writeFileSync(sample, "demo change from isolated worktree\n", {
+    mode: 0o600,
+  });
   try {
-    await execFileAsync("git", ["add", "-A"], { cwd: wt.path, timeout: 15_000 });
-    await execFileAsync("git", ["commit", "-m", "demo: isolated worktree change"], { cwd: wt.path, timeout: 15_000, env: { ...process.env, GIT_AUTHOR_NAME: "bridge-demo", GIT_AUTHOR_EMAIL: "demo@example.invalid", GIT_COMMITTER_NAME: "bridge-demo", GIT_COMMITTER_EMAIL: "demo@example.invalid" } });
+    await execFileAsync("git", ["add", "-A"], {
+      cwd: wt.path,
+      timeout: 15_000,
+    });
+    await execFileAsync(
+      "git",
+      ["commit", "-m", "demo: isolated worktree change"],
+      {
+        cwd: wt.path,
+        timeout: 15_000,
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: "bridge-demo",
+          GIT_AUTHOR_EMAIL: "demo@example.invalid",
+          GIT_COMMITTER_NAME: "bridge-demo",
+          GIT_COMMITTER_EMAIL: "demo@example.invalid",
+        },
+      },
+    );
   } catch (err) {
     void err;
   }
@@ -290,7 +379,10 @@ async function demo3(scratch: string, ctx: { repoRoot: string }, _log: ReturnTyp
   const { execFile: _execFile } = await import("node:child_process");
   const { promisify: _promisify } = await import("node:util");
   const _run = _promisify(_execFile);
-  const status = await _run("git", ["status", "--porcelain"], { cwd: ctx.repoRoot, timeout: 15_000 });
+  const status = await _run("git", ["status", "--porcelain"], {
+    cwd: ctx.repoRoot,
+    timeout: 15_000,
+  });
   const trackedDirty = status.stdout
     .split("\n")
     .some((l) => l.trim().length > 0 && !l.includes(".handoff/"));
@@ -306,7 +398,11 @@ async function demo3(scratch: string, ctx: { repoRoot: string }, _log: ReturnTyp
   await removeWorktree(ctx.repoRoot, wt.path).catch(() => {});
 }
 
-async function demo4(scratch: string, ctx: { repoRoot: string }, log: ReturnType<typeof createLogger>): Promise<void> {
+async function demo4(
+  scratch: string,
+  ctx: { repoRoot: string },
+  log: ReturnType<typeof createLogger>,
+): Promise<void> {
   void scratch;
   const manager = await managerWithFakes(ctx.repoRoot, scratch, log);
   const request: StartRequest = {
@@ -323,21 +419,39 @@ async function demo4(scratch: string, ctx: { repoRoot: string }, log: ReturnType
     },
   };
   try {
-    await manager.enqueue(request, { host: "cursor", tool: "codex_start", client: "demo" });
-    report("demo4 recursion-blocked", { rejected: false, note: "UNEXPECTED: nested delegation was accepted" });
+    await manager.enqueue(request, {
+      host: "cursor",
+      tool: "codex_start",
+      client: "demo",
+    });
+    report("demo4 recursion-blocked", {
+      rejected: false,
+      note: "UNEXPECTED: nested delegation was accepted",
+    });
   } catch (err) {
     const be = asBridgeError(err);
     report("demo4 recursion-blocked", { rejected: true, code: be.code });
   }
 }
 
-async function demo5(scratch: string, ctx: { repoRoot: string }, _log: ReturnType<typeof createLogger>): Promise<void> {
+async function demo5(
+  scratch: string,
+  ctx: { repoRoot: string },
+  _log: ReturnType<typeof createLogger>,
+): Promise<void> {
   // Spawn a long-lived fake app-server mid-turn and cancel it; assert the
   // process tree dies and the job records a cancelled result. The cancel
   // demo uses a delayed fake whose turn never finishes before cancellation.
-  const fakeSlow = await materializeFake(scratch, "fake-codex-slow.cjs", fakeCodexAppServerScript({ turnDelayMs: 30_000 }));
+  const fakeSlow = await materializeFake(
+    scratch,
+    "fake-codex-slow.cjs",
+    fakeCodexAppServerScript({ turnDelayMs: 30_000 }),
+  );
   const manager = await managerWithFakes(ctx.repoRoot, scratch, _log, {
-    codex: new CodexAppServerAdapter({ argvOverride: [process.execPath, fakeSlow], extraEnv: {} }),
+    codex: new CodexAppServerAdapter({
+      argvOverride: [process.execPath, fakeSlow],
+      extraEnv: {},
+    }),
   });
   const request: StartRequest = {
     task: "Long investigation that will be cancelled.",
@@ -347,7 +461,11 @@ async function demo5(scratch: string, ctx: { repoRoot: string }, _log: ReturnTyp
     background: false,
     origin: { host: "cursor", handoffDepth: 0, maxHandoffDepth: 1 },
   };
-  const enq = await manager.enqueue(request, { host: "cursor", tool: "codex_start", client: "demo" });
+  const enq = await manager.enqueue(request, {
+    host: "cursor",
+    tool: "codex_start",
+    client: "demo",
+  });
   const runPromise = manager.run(enq.jobId);
   setTimeout(() => {
     manager.cancel(enq.jobId, "demo cancellation").catch(() => {});
@@ -361,5 +479,7 @@ async function demo5(scratch: string, ctx: { repoRoot: string }, _log: ReturnTyp
 }
 
 function report(title: string, payload: Record<string, unknown>): void {
-  process.stdout.write(`\n=== ${title} ===\n${JSON.stringify(payload, null, 2)}\n`);
+  process.stdout.write(
+    `\n=== ${title} ===\n${JSON.stringify(payload, null, 2)}\n`,
+  );
 }

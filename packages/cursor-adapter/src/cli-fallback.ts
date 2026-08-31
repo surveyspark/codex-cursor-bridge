@@ -19,7 +19,12 @@ import {
 } from "@codex-cursor-bridge/bridge-core";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { AdapterAvailability, AdapterCapabilities, AdapterRunContext, AgentAdapter } from "./types.js";
+import type {
+  AdapterAvailability,
+  AdapterCapabilities,
+  AdapterRunContext,
+  AgentAdapter,
+} from "./types.js";
 import { buildTaskPrompt } from "./prompt.js";
 
 const execFileAsync = promisify(execFile);
@@ -46,7 +51,11 @@ export class CursorCliFallbackAdapter implements AgentAdapter {
 
   private binary(): string {
     if (this.opts.argvOverride) return this.opts.argvOverride[0]!;
-    return this.opts.cursorBinaryPath ?? process.env.CCB_CURSOR_BINARY ?? "cursor-agent";
+    return (
+      this.opts.cursorBinaryPath ??
+      process.env.CCB_CURSOR_BINARY ??
+      "cursor-agent"
+    );
   }
 
   private baseArgs(): string[] {
@@ -56,11 +65,18 @@ export class CursorCliFallbackAdapter implements AgentAdapter {
 
   async isAvailable(): Promise<AdapterAvailability> {
     if (!this.opts.allowNonInteractive) {
-      return { available: false, reason: "non-interactive CLI fallback requires explicit opt-in (config allowNonInteractiveCliFallback=true)" };
+      return {
+        available: false,
+        reason:
+          "non-interactive CLI fallback requires explicit opt-in (config allowNonInteractiveCliFallback=true)",
+      };
     }
-    if (this.opts.argvOverride) return { available: true, version: "test-fake" };
+    if (this.opts.argvOverride)
+      return { available: true, version: "test-fake" };
     try {
-      const { stdout } = await execFileAsync(this.binary(), ["--version"], { timeout: 10_000 });
+      const { stdout } = await execFileAsync(this.binary(), ["--version"], {
+        timeout: 10_000,
+      });
       return { available: true, version: stdout.trim() };
     } catch {
       return { available: false, reason: "cursor-agent CLI not found on PATH" };
@@ -73,8 +89,19 @@ export class CursorCliFallbackAdapter implements AgentAdapter {
       continuation: true,
       structuredEvents: false,
       approvals: "none",
-      sandboxProfiles: ["read-only", "isolated-workspace-write", "current-workspace-write"],
-      modes: ["investigate", "review", "adversarial-review", "rescue", "plan", "implement"],
+      sandboxProfiles: [
+        "read-only",
+        "isolated-workspace-write",
+        "current-workspace-write",
+      ],
+      modes: [
+        "investigate",
+        "review",
+        "adversarial-review",
+        "rescue",
+        "plan",
+        "implement",
+      ],
     };
   }
 
@@ -116,7 +143,11 @@ export class CursorCliFallbackAdapter implements AgentAdapter {
         }
         if (typeof ev.type === "string") {
           eventType = ev.type;
-          ctx.emit({ type: "cursor-cli.event", level: "debug", data: { type: ev.type } });
+          ctx.emit({
+            type: "cursor-cli.event",
+            level: "debug",
+            data: { type: ev.type },
+          });
         }
         if (eventType === "result" && typeof ev.result === "string") {
           resultText = ev.result;
@@ -139,7 +170,10 @@ export class CursorCliFallbackAdapter implements AgentAdapter {
         status: ctx.abortSignal.aborted ? "cancelled" : "timed-out",
         summary: "Cursor CLI run cancelled/timed out.",
         continuation: sessionId
-          ? { supported: true, how: `resume natively with \`cursor-agent --resume ${sessionId}\`` }
+          ? {
+              supported: true,
+              how: `resume natively with \`cursor-agent --resume ${sessionId}\``,
+            }
           : { supported: false, how: "no session id captured" },
         startedAt,
         finishedAt,
@@ -157,7 +191,11 @@ export class CursorCliFallbackAdapter implements AgentAdapter {
         continuation: { supported: false, how: "no session id on failure" },
         startedAt,
         finishedAt,
-        failure: { code: "CHILD_EXITED", message: `exit code ${exit.code}`, retriable: false },
+        failure: {
+          code: "CHILD_EXITED",
+          message: `exit code ${exit.code}`,
+          retriable: false,
+        },
       };
     }
 
@@ -168,7 +206,10 @@ export class CursorCliFallbackAdapter implements AgentAdapter {
       status: "completed",
       summary: (resultText ?? "(no result event captured)").slice(0, 10_000),
       continuation: sessionId
-        ? { supported: true, how: `resume natively with \`cursor-agent --resume ${sessionId}\`; follow-ups via a new bridge job with this session id` }
+        ? {
+            supported: true,
+            how: `resume natively with \`cursor-agent --resume ${sessionId}\`; follow-ups via a new bridge job with this session id`,
+          }
         : { supported: false, how: "no session id captured" },
       startedAt,
       finishedAt,

@@ -20,7 +20,9 @@ afterAll(() => {
   for (const c of cleanups) c();
 });
 
-function ctx(overrides: Partial<Parameters<CodexAppServerAdapter["run"]>[1]> = {}): Parameters<CodexAppServerAdapter["run"]>[1] {
+function ctx(
+  overrides: Partial<Parameters<CodexAppServerAdapter["run"]>[1]> = {},
+): Parameters<CodexAppServerAdapter["run"]>[1] {
   return {
     jobId: "job_" + "0".repeat(32),
     cwd: os.tmpdir(),
@@ -35,7 +37,9 @@ function ctx(overrides: Partial<Parameters<CodexAppServerAdapter["run"]>[1]> = {
   } as Parameters<CodexAppServerAdapter["run"]>[1];
 }
 
-function request(overrides: Partial<Parameters<CodexAppServerAdapter["run"]>[0]> = {}): Parameters<CodexAppServerAdapter["run"]>[0] {
+function request(
+  overrides: Partial<Parameters<CodexAppServerAdapter["run"]>[0]> = {},
+): Parameters<CodexAppServerAdapter["run"]>[0] {
   return {
     task: "test task",
     cwd: os.tmpdir(),
@@ -52,14 +56,19 @@ describe("codex app-server adapter protocol", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-proto-"));
     cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
     const fake = materializeFake(dir, "fake.cjs", fakeCodexAppServer({}));
-    const adapter = new CodexAppServerAdapter({ argvOverride: [process.execPath, fake] });
+    const adapter = new CodexAppServerAdapter({
+      argvOverride: [process.execPath, fake],
+    });
     const nativeIds: string[] = [];
     const events: string[] = [];
-    const res = await adapter.run(request(), ctx({
-      cwd: dir,
-      onNativeId: (n) => nativeIds.push(n),
-      emit: (e) => events.push(e.type),
-    }));
+    const res = await adapter.run(
+      request(),
+      ctx({
+        cwd: dir,
+        onNativeId: (n) => nativeIds.push(n),
+        emit: (e) => events.push(e.type),
+      }),
+    );
     expect(res.status).toBe("completed");
     expect(res.nativeId).toMatch(/^thr-fake-/);
     expect(nativeIds.length).toBeGreaterThan(0);
@@ -73,7 +82,9 @@ describe("codex app-server adapter protocol", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-proto-"));
     cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
     const fake = materializeFake(dir, "fake.cjs", fakeCodexAppServer({}));
-    const adapter = new CodexAppServerAdapter({ argvOverride: [process.execPath, fake] });
+    const adapter = new CodexAppServerAdapter({
+      argvOverride: [process.execPath, fake],
+    });
     const res = await adapter.run(request(), ctx({ cwd: dir }));
     expect(res.commands?.length).toBeGreaterThan(0);
     expect(res.commands?.[0]?.command).toContain("echo fake");
@@ -83,13 +94,22 @@ describe("codex app-server adapter protocol", () => {
   it("auto-denies exec approval requests and continues", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-proto-"));
     cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
-    const fake = materializeFake(dir, "fake.cjs", fakeCodexAppServer({ emitApprovalRequest: true }));
-    const adapter = new CodexAppServerAdapter({ argvOverride: [process.execPath, fake] });
+    const fake = materializeFake(
+      dir,
+      "fake.cjs",
+      fakeCodexAppServer({ emitApprovalRequest: true }),
+    );
+    const adapter = new CodexAppServerAdapter({
+      argvOverride: [process.execPath, fake],
+    });
     const approvals: Array<{ kind: string; decision: string }> = [];
-    const res = await adapter.run(request(), ctx({
-      cwd: dir,
-      approval: (a) => approvals.push({ kind: a.kind, decision: a.decision }),
-    }));
+    const res = await adapter.run(
+      request(),
+      ctx({
+        cwd: dir,
+        approval: (a) => approvals.push({ kind: a.kind, decision: a.decision }),
+      }),
+    );
     expect(res.status).toBe("completed");
     expect(approvals.length).toBeGreaterThan(0);
     expect(approvals[0]?.decision).toBe("auto-denied");
@@ -98,8 +118,14 @@ describe("codex app-server adapter protocol", () => {
   it("survives malformed JSON lines from the child", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-proto-"));
     cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
-    const fake = materializeFake(dir, "fake.cjs", fakeCodexAppServer({ malformedAfterInit: true }));
-    const adapter = new CodexAppServerAdapter({ argvOverride: [process.execPath, fake] });
+    const fake = materializeFake(
+      dir,
+      "fake.cjs",
+      fakeCodexAppServer({ malformedAfterInit: true }),
+    );
+    const adapter = new CodexAppServerAdapter({
+      argvOverride: [process.execPath, fake],
+    });
     const res = await adapter.run(request(), ctx({ cwd: dir }));
     expect(res.status).toBe("completed");
   }, 20_000);
@@ -108,8 +134,14 @@ describe("codex app-server adapter protocol", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-proto-"));
     cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
     // Fake exits 3s after start, mid-turn.
-    const fake = materializeFake(dir, "fake.cjs", fakeCodexAppServer({ turnDelayMs: 60_000, exitAfterMs: 1500 }));
-    const adapter = new CodexAppServerAdapter({ argvOverride: [process.execPath, fake] });
+    const fake = materializeFake(
+      dir,
+      "fake.cjs",
+      fakeCodexAppServer({ turnDelayMs: 60_000, exitAfterMs: 1500 }),
+    );
+    const adapter = new CodexAppServerAdapter({
+      argvOverride: [process.execPath, fake],
+    });
     const res = await adapter.run(request(), ctx({ cwd: dir }));
     expect(res.status).toBe("failed");
     expect(res.failure?.code).toBe("CHILD_EXITED");
@@ -119,8 +151,14 @@ describe("codex app-server adapter protocol", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-proto-"));
     cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
     const fake = materializeFake(dir, "fake.cjs", fakeCodexAppServer({}));
-    const adapter = new CodexAppServerAdapter({ argvOverride: [process.execPath, fake] });
-    const res = await adapter.reply!("thr-fake-xyz", "follow-up question", ctx({ cwd: dir }));
+    const adapter = new CodexAppServerAdapter({
+      argvOverride: [process.execPath, fake],
+    });
+    const res = await adapter.reply!(
+      "thr-fake-xyz",
+      "follow-up question",
+      ctx({ cwd: dir }),
+    );
     expect(res.status).toBe("completed");
     expect(res.nativeId).toBe("thr-fake-xyz");
   }, 20_000);
@@ -131,12 +169,17 @@ describe("cursor ACP adapter protocol", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-acp-"));
     cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
     const fake = materializeFake(dir, "fake-acp.cjs", fakeCursorAcp({}));
-    const adapter = new CursorAcpAdapter({ argvOverride: [process.execPath, fake] });
+    const adapter = new CursorAcpAdapter({
+      argvOverride: [process.execPath, fake],
+    });
     const nativeIds: string[] = [];
-    const res = await adapter.run(request(), ctx({
-      cwd: dir,
-      onNativeId: (n) => nativeIds.push(n),
-    }));
+    const res = await adapter.run(
+      request(),
+      ctx({
+        cwd: dir,
+        onNativeId: (n) => nativeIds.push(n),
+      }),
+    );
     expect(res.status).toBe("completed");
     expect(res.nativeId).toMatch(/^sess-fake-/);
     expect(nativeIds.length).toBeGreaterThan(0);
@@ -146,10 +189,22 @@ describe("cursor ACP adapter protocol", () => {
   it("denies permission requests (relayed policy)", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-acp-"));
     cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
-    const fake = materializeFake(dir, "fake-acp.cjs", fakeCursorAcp({ requestPermission: true }));
-    const adapter = new CursorAcpAdapter({ argvOverride: [process.execPath, fake] });
+    const fake = materializeFake(
+      dir,
+      "fake-acp.cjs",
+      fakeCursorAcp({ requestPermission: true }),
+    );
+    const adapter = new CursorAcpAdapter({
+      argvOverride: [process.execPath, fake],
+    });
     const approvals: Array<{ decision: string }> = [];
-    await adapter.run(request(), ctx({ cwd: dir, approval: (a) => approvals.push({ decision: a.decision }) }));
+    await adapter.run(
+      request(),
+      ctx({
+        cwd: dir,
+        approval: (a) => approvals.push({ decision: a.decision }),
+      }),
+    );
     // The fake never actually sends a server request in this variant; the
     // deny path is exercised by the bridge policy unit. Assert run completes.
     expect(approvals.length).toBe(0);
@@ -160,19 +215,26 @@ describe("cursor CLI fallback", () => {
   it("parses stream-json result events and session id", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-cli-"));
     cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
-    const fake = materializeFake(dir, "fake-cli.cjs", [
-      "const NL = String.fromCharCode(10);",
-      "let buf = '';",
-      "process.stdin.on('data', (d) => { buf += d; });",
-      "process.stdin.on('end', () => {",
-      "  process.stdout.write(JSON.stringify({ type: 'system', session_id: 'sess-cli-1' }) + NL);",
-      "  process.stdout.write(JSON.stringify({ type: 'assistant', session_id: 'sess-cli-1' }) + NL);",
-      "  process.stdout.write(JSON.stringify({ type: 'result', session_id: 'sess-cli-1', result: 'CLI final answer', is_error: false }) + NL);",
-      "  process.exit(0);",
-      "});",
-      "setTimeout(() => process.exit(0), 60000);",
-    ].join("\n"));
-    const adapter = new CursorCliFallbackAdapter({ allowNonInteractive: true, argvOverride: [process.execPath, fake] });
+    const fake = materializeFake(
+      dir,
+      "fake-cli.cjs",
+      [
+        "const NL = String.fromCharCode(10);",
+        "let buf = '';",
+        "process.stdin.on('data', (d) => { buf += d; });",
+        "process.stdin.on('end', () => {",
+        "  process.stdout.write(JSON.stringify({ type: 'system', session_id: 'sess-cli-1' }) + NL);",
+        "  process.stdout.write(JSON.stringify({ type: 'assistant', session_id: 'sess-cli-1' }) + NL);",
+        "  process.stdout.write(JSON.stringify({ type: 'result', session_id: 'sess-cli-1', result: 'CLI final answer', is_error: false }) + NL);",
+        "  process.exit(0);",
+        "});",
+        "setTimeout(() => process.exit(0), 60000);",
+      ].join("\n"),
+    );
+    const adapter = new CursorCliFallbackAdapter({
+      allowNonInteractive: true,
+      argvOverride: [process.execPath, fake],
+    });
     const res = await adapter.run(request(), ctx({ cwd: dir }));
     expect(res.status).toBe("completed");
     expect(res.nativeId).toBe("sess-cli-1");
@@ -180,7 +242,9 @@ describe("cursor CLI fallback", () => {
   }, 20_000);
 
   it("is unavailable without explicit opt-in", async () => {
-    const adapter = new CursorCliFallbackAdapter({ allowNonInteractive: false });
+    const adapter = new CursorCliFallbackAdapter({
+      allowNonInteractive: false,
+    });
     const st = await adapter.isAvailable();
     expect(st.available).toBe(false);
     expect(st.reason).toContain("opt-in");
@@ -192,13 +256,19 @@ describe("codex exec fallback", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-exec-"));
     cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
     // Fake `codex exec` that emits --json events.
-    const fake = materializeFake(dir, "fake-exec.cjs", [
-      "const NL = String.fromCharCode(10);",
-      "process.stdout.write(JSON.stringify({ msg: { type: 'thread_started', payload: { thread_id: 'ses-123' } } }) + NL);",
-      "process.stdout.write(JSON.stringify({ msg: { type: 'agent_message', payload: { message: 'exec done' } } }) + NL);",
-      "process.exit(0);",
-    ].join("\n"));
-    const adapter = new CodexExecAdapter({ argvOverride: [process.execPath, fake] });
+    const fake = materializeFake(
+      dir,
+      "fake-exec.cjs",
+      [
+        "const NL = String.fromCharCode(10);",
+        "process.stdout.write(JSON.stringify({ msg: { type: 'thread_started', payload: { thread_id: 'ses-123' } } }) + NL);",
+        "process.stdout.write(JSON.stringify({ msg: { type: 'agent_message', payload: { message: 'exec done' } } }) + NL);",
+        "process.exit(0);",
+      ].join("\n"),
+    );
+    const adapter = new CodexExecAdapter({
+      argvOverride: [process.execPath, fake],
+    });
     const res = await adapter.run(request(), ctx({ cwd: dir }));
     expect(res.status).toBe("completed");
     expect(res.summary).toContain("exec done");
@@ -255,7 +325,10 @@ describe("job store", () => {
       r.status = "completed";
       r.finishedAt = new Date(Date.now() - 30 * 86_400_000).toISOString();
     });
-    const removed = store2.clean({ completedRetentionDays: 7, failedRetentionDays: 14 });
+    const removed = store2.clean({
+      completedRetentionDays: 7,
+      failedRetentionDays: 14,
+    });
     expect(removed).toContain(id);
     expect(store2.exists(id)).toBe(false);
   }, 30_000);

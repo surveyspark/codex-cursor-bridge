@@ -28,7 +28,6 @@ export interface CodexSandbox {
 }
 
 export function mapProfileToSandbox(
-  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   profile: PermissionProfile,
   cwd: string,
   networkPolicy: "denied" | "allowed",
@@ -36,7 +35,10 @@ export function mapProfileToSandbox(
   if (profile === "read-only") {
     return {
       sandboxMode: "read-only",
-      turnSandboxPolicy: { type: "readOnly", networkAccess: networkPolicy === "allowed" },
+      turnSandboxPolicy: {
+        type: "readOnly",
+        networkAccess: networkPolicy === "allowed",
+      },
       notes: ["codex sandbox: read-only"],
     };
   }

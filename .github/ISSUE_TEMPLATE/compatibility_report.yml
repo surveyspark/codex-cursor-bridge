@@ -16,7 +16,7 @@ body:
         - Node: 
         - Codex CLI: 
         - Cursor CLI: 
-        - Bridge: 
+        - Bridge:
     validations:
       required: true
   - type: textarea

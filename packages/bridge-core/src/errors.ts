@@ -77,7 +77,10 @@ export class BridgeError extends Error {
     message: string,
     opts: { retriable?: boolean; cause?: unknown; details?: unknown } = {},
   ) {
-    super(message, opts.cause !== undefined ? { cause: opts.cause } : undefined);
+    super(
+      message,
+      opts.cause !== undefined ? { cause: opts.cause } : undefined,
+    );
     this.name = "BridgeError";
     this.code = code;
     this.retriable = opts.retriable ?? false;

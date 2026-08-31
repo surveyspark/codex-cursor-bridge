@@ -9,36 +9,108 @@
 
 const PATTERNS: Array<{ name: string; re: RegExp; replace: string }> = [
   // OpenAI-style keys
-  { name: "openai-key", re: /\bsk-[A-Za-z0-9_-]{16,}\b/g, replace: "sk-***REDACTED***" },
-  { name: "openai-project", re: /\bsk-proj-[A-Za-z0-9_-]{16,}\b/g, replace: "sk-proj-***REDACTED***" },
+  {
+    name: "openai-key",
+    re: /\bsk-[A-Za-z0-9_-]{16,}\b/g,
+    replace: "sk-***REDACTED***",
+  },
+  {
+    name: "openai-project",
+    re: /\bsk-proj-[A-Za-z0-9_-]{16,}\b/g,
+    replace: "sk-proj-***REDACTED***",
+  },
   // Anthropic
-  { name: "anthropic-key", re: /\bsk-ant-[A-Za-z0-9_-]{16,}\b/g, replace: "sk-ant-***REDACTED***" },
+  {
+    name: "anthropic-key",
+    re: /\bsk-ant-[A-Za-z0-9_-]{16,}\b/g,
+    replace: "sk-ant-***REDACTED***",
+  },
   // Cursor API key (functional env var name is never logged with value)
-  { name: "cursor-key", re: /\bkey_[A-Za-z0-9]{20,}\b/g, replace: "key_***REDACTED***" },
+  {
+    name: "cursor-key",
+    re: /\bkey_[A-Za-z0-9]{20,}\b/g,
+    replace: "key_***REDACTED***",
+  },
   // GitHub tokens
-  { name: "github-token", re: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b/g, replace: "gh***REDACTED***" },
-  { name: "github-finegrained", re: /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g, replace: "github_pat_***REDACTED***" },
+  {
+    name: "github-token",
+    re: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b/g,
+    replace: "gh***REDACTED***",
+  },
+  {
+    name: "github-finegrained",
+    re: /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g,
+    replace: "github_pat_***REDACTED***",
+  },
   // AWS
-  { name: "aws-access-key", re: /\bAKIA[0-9A-Z]{16}\b/g, replace: "AKIA***REDACTED***" },
-  { name: "aws-secret", re: /\b(?:aws)?_?secret_?access_?key\s*[:=]\s*\S+/gi, replace: "aws_secret_access_key=***REDACTED***" },
+  {
+    name: "aws-access-key",
+    re: /\bAKIA[0-9A-Z]{16}\b/g,
+    replace: "AKIA***REDACTED***",
+  },
+  {
+    name: "aws-secret",
+    re: /\b(?:aws)?_?secret_?access_?key\s*[:=]\s*\S+/gi,
+    replace: "aws_secret_access_key=***REDACTED***",
+  },
   // Google
-  { name: "google-api-key", re: /\bAIza[0-9A-Za-z_-]{30,}\b/g, replace: "AIza***REDACTED***" },
+  {
+    name: "google-api-key",
+    re: /\bAIza[0-9A-Za-z_-]{30,}\b/g,
+    replace: "AIza***REDACTED***",
+  },
   // Slack
-  { name: "slack-token", re: /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g, replace: "xox***-***REDACTED***" },
+  {
+    name: "slack-token",
+    re: /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g,
+    replace: "xox***-***REDACTED***",
+  },
   // Bearer / authorization headers
-  { name: "bearer", re: /\bBearer\s+[A-Za-z0-9._~+/-]{8,}=?=?/gi, replace: "Bearer ***REDACTED***" },
-  { name: "authorization-header", re: /\b(authorization|proxy-authorization)\s*:\s*\S+/gi, replace: "$1: ***REDACTED***" },
+  {
+    name: "bearer",
+    re: /\bBearer\s+[A-Za-z0-9._~+/-]{8,}=?=?/gi,
+    replace: "Bearer ***REDACTED***",
+  },
+  {
+    name: "authorization-header",
+    re: /\b(authorization|proxy-authorization)\s*:\s*\S+/gi,
+    replace: "$1: ***REDACTED***",
+  },
   // Cookies
-  { name: "cookie-header", re: /\bcookie\s*:\s*[^\n\r]{4,}/gi, replace: "cookie: ***REDACTED***" },
-  { name: "set-cookie", re: /\bset-cookie\s*:\s*[^\n\r]{4,}/gi, replace: "set-cookie: ***REDACTED***" },
+  {
+    name: "cookie-header",
+    re: /\bcookie\s*:\s*[^\n\r]{4,}/gi,
+    replace: "cookie: ***REDACTED***",
+  },
+  {
+    name: "set-cookie",
+    re: /\bset-cookie\s*:\s*[^\n\r]{4,}/gi,
+    replace: "set-cookie: ***REDACTED***",
+  },
   // Private key blocks (single line and multiline)
-  { name: "private-key", re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----/g, replace: "***REDACTED-PRIVATE-KEY***" },
+  {
+    name: "private-key",
+    re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----/g,
+    replace: "***REDACTED-PRIVATE-KEY***",
+  },
   // password assignments
-  { name: "password-assignment", re: /\b(password|passwd|pwd|pass|secret|token|api[_-]?key)\s*[:=]\s*["']?[^\s"']{6,}["']?/gi, replace: "$1=***REDACTED***" },
+  {
+    name: "password-assignment",
+    re: /\b(password|passwd|pwd|pass|secret|token|api[_-]?key)\s*[:=]\s*["']?[^\s"']{6,}["']?/gi,
+    replace: "$1=***REDACTED***",
+  },
   // JSON-style "apiKey": "..." fields
-  { name: "json-api-key", re: /("(?:apiKey|api_key|secret|token|password|accessToken|access_token|refreshToken|refresh_token)"\s*:\s*")([^"]{4,})(")/g, replace: "$1***REDACTED***$3" },
+  {
+    name: "json-api-key",
+    re: /("(?:apiKey|api_key|secret|token|password|accessToken|access_token|refreshToken|refresh_token)"\s*:\s*")([^"]{4,})(")/g,
+    replace: "$1***REDACTED***$3",
+  },
   // JWTs
-  { name: "jwt", re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, replace: "***REDACTED-JWT***" },
+  {
+    name: "jwt",
+    re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g,
+    replace: "***REDACTED-JWT***",
+  },
 ];
 
 export interface RedactionResult {

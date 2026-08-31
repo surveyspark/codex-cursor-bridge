@@ -16,8 +16,17 @@ export function assertTransitionSafe(from: JobStatus, to: JobStatus): void {
   }
 }
 
-export { JobStore, newJobId, assertTransition } from "@codex-cursor-bridge/job-store";
-export { CodexAppServerAdapter, CodexExecAdapter, mapProfileToSandbox, buildTaskPrompt } from "@codex-cursor-bridge/codex-adapter";
+export {
+  JobStore,
+  newJobId,
+  assertTransition,
+} from "@codex-cursor-bridge/job-store";
+export {
+  CodexAppServerAdapter,
+  CodexExecAdapter,
+  mapProfileToSandbox,
+  buildTaskPrompt,
+} from "@codex-cursor-bridge/codex-adapter";
 export {
   CursorSdkAdapter,
   CursorAcpAdapter,

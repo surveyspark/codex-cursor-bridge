@@ -8,21 +8,13 @@
   "homepage": "https://github.com/surveyspark/codex-cursor-bridge",
   "repository": "https://github.com/surveyspark/codex-cursor-bridge",
   "license": "Apache-2.0",
-  "keywords": [
-    "cursor",
-    "delegation",
-    "implementation",
-    "handoff",
-    "plan"
-  ],
+  "keywords": ["cursor", "delegation", "implementation", "handoff", "plan"],
   "skills": "./skills/",
   "interface": {
     "displayName": "Codex-Cursor Bridge",
     "shortDescription": "Hand off execution plans to Cursor",
     "longDescription": "Produce validated implementation plans in Codex and delegate execution to Cursor agents through managed background jobs with permission profiles, worktree isolation, and diff review.",
     "category": "Developer Tools",
-    "capabilities": [
-      "Interactive"
-    ]
+    "capabilities": ["Interactive"]
   }
 }

@@ -29,20 +29,28 @@ function validateSkillDir(skillsDir, prefix) {
     }
     const text = fs.readFileSync(skillMd, "utf8");
     if (!text.startsWith("---")) {
-      errors.push(`${prefix}/skills/${entry.name}/SKILL.md: missing frontmatter`);
+      errors.push(
+        `${prefix}/skills/${entry.name}/SKILL.md: missing frontmatter`,
+      );
       continue;
     }
     const end = text.indexOf("---", 3);
     const fm = text.slice(3, end);
     const nameMatch = /name:\s*"?([a-z0-9-]+)"?/.exec(fm);
     if (!nameMatch) {
-      errors.push(`${prefix}/skills/${entry.name}/SKILL.md: frontmatter "name" missing or not kebab-case`);
+      errors.push(
+        `${prefix}/skills/${entry.name}/SKILL.md: frontmatter "name" missing or not kebab-case`,
+      );
     } else if (nameMatch[1] !== entry.name) {
-      errors.push(`${prefix}/skills/${entry.name}/SKILL.md: frontmatter name "${nameMatch[1]}" != directory name`);
+      errors.push(
+        `${prefix}/skills/${entry.name}/SKILL.md: frontmatter name "${nameMatch[1]}" != directory name`,
+      );
     }
     const descMatch = /description:/.test(fm);
     if (!descMatch || fm.split("description:")[1]?.trim().length === 0) {
-      errors.push(`${prefix}/skills/${entry.name}/SKILL.md: frontmatter "description" required`);
+      errors.push(
+        `${prefix}/skills/${entry.name}/SKILL.md: frontmatter "description" required`,
+      );
     }
   }
 }
@@ -101,7 +109,12 @@ const codexDir = path.join(root, "plugins/codex-plans-cursor-executes");
 validateCommon(codexDir, ".codex-plugin", "codex-plugin");
 
 // JSON Schemas parse
-for (const f of ["handoff-plan.schema.json", "job-record.schema.json", "result.schema.json", "config.schema.json"]) {
+for (const f of [
+  "handoff-plan.schema.json",
+  "job-record.schema.json",
+  "result.schema.json",
+  "config.schema.json",
+]) {
   readJsonSafe(path.join(root, "schemas", f));
 }
 

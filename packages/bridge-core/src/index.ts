@@ -8,11 +8,7 @@ import * as jsonrpc from "./jsonrpc.js";
 import * as config from "./config.js";
 import * as logger from "./logger.js";
 
-export const {
-  BRIDGE_VERSION,
-  TERMINAL_JOB_STATUSES,
-  DEFAULT_CONFIG,
-} = types;
+export const { BRIDGE_VERSION, TERMINAL_JOB_STATUSES, DEFAULT_CONFIG } = types;
 export type {
   Host,
   OriginHost,
@@ -48,7 +44,12 @@ export {
 } from "./validate.js";
 export type { ValidationIssue, ValidationResult } from "./validate.js";
 
-export { redactSecrets, redactString, redactDeep, isSecretEnvName } from "./redact.js";
+export {
+  redactSecrets,
+  redactString,
+  redactDeep,
+  isSecretEnvName,
+} from "./redact.js";
 
 export {
   canonicalize,
@@ -92,5 +93,15 @@ export type { LoadedConfig } from "./config.js";
 export { createLogger, getNullLogger } from "./logger.js";
 export type { Logger, LogLevel, CreateLoggerOptions } from "./logger.js";
 
-export const __modules = { types, errors, validate, redact, paths, process: proc, jsonrpc, config, logger };
+export const __modules = {
+  types,
+  errors,
+  validate,
+  redact,
+  paths,
+  process: proc,
+  jsonrpc,
+  config,
+  logger,
+};
 void __modules;

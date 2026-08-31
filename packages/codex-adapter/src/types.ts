@@ -48,7 +48,11 @@ export interface AgentAdapter {
    * Send a follow-up message to an existing native session.
    * Returns false when the adapter cannot continue that session.
    */
-  reply?(nativeId: string, message: string, ctx: AdapterRunContext): Promise<JobResult>;
+  reply?(
+    nativeId: string,
+    message: string,
+    ctx: AdapterRunContext,
+  ): Promise<JobResult>;
   /** Terminate a running native session when supported. */
   cancel?(nativeId: string): Promise<boolean>;
   /** Capability description for doctor output. */
@@ -70,20 +74,28 @@ export interface AdapterCapabilities {
   modes: DelegationMode[];
 }
 
-export function permissionProfileSandbox(
-  profile: PermissionProfile,
-): { sandbox: string; notes: string[] } {
+export function permissionProfileSandbox(profile: PermissionProfile): {
+  sandbox: string;
+  notes: string[];
+} {
   if (profile === "read-only") {
-    return { sandbox: "read-only", notes: ["agent runs with read-only filesystem sandbox"] };
+    return {
+      sandbox: "read-only",
+      notes: ["agent runs with read-only filesystem sandbox"],
+    };
   }
   if (profile === "isolated-workspace-write") {
     return {
       sandbox: "workspace-write",
-      notes: ["agent runs with workspace-write inside an isolated git worktree"],
+      notes: [
+        "agent runs with workspace-write inside an isolated git worktree",
+      ],
     };
   }
   return {
     sandbox: "workspace-write",
-    notes: ["agent runs with workspace-write directly in the current working tree"],
+    notes: [
+      "agent runs with workspace-write directly in the current working tree",
+    ],
   };
 }

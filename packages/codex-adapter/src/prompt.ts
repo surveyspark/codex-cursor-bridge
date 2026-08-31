@@ -29,8 +29,7 @@ const MODE_GUIDANCE: Record<StartRequest["mode"], string> = {
     "Mode: ADVERSARIAL REVIEW (read-only). Actively try to break the approach: find edge cases, race conditions, injection vectors, and incorrect assumptions. Do not modify any files.",
   rescue:
     "Mode: RESCUE. Previous implementation attempts failed. Diagnose why earlier approaches failed (see context), identify the least-risky path forward, and state it explicitly.",
-  plan:
-    "Mode: PLAN (read-only). Produce an implementation plan as your final answer. Do not modify any files.",
+  plan: "Mode: PLAN (read-only). Produce an implementation plan as your final answer. Do not modify any files.",
   implement:
     "Mode: IMPLEMENT. Make the requested changes, run the relevant tests, and report exactly what changed.",
 };
@@ -40,7 +39,10 @@ export interface PromptOptions {
   extraGuard?: string;
 }
 
-export function buildTaskPrompt(request: StartRequest, targetHost: "codex" | "cursor"): string {
+export function buildTaskPrompt(
+  request: StartRequest,
+  targetHost: "codex" | "cursor",
+): string {
   const parts: string[] = [];
 
   parts.push(`# Delegated task (${request.mode})`);
@@ -69,7 +71,9 @@ export function buildTaskPrompt(request: StartRequest, targetHost: "codex" | "cu
     parts.push("");
     parts.push("## Implementation requirements");
     parts.push("- Make focused changes; avoid drive-by refactors.");
-    parts.push("- Run the repository's relevant tests or type checks when they exist and report their exact outcome.");
+    parts.push(
+      "- Run the repository's relevant tests or type checks when they exist and report their exact outcome.",
+    );
     parts.push("- List every file you created, modified, or deleted.");
     parts.push("- Report any deviation from the task as an explicit warning.");
   }
@@ -106,11 +110,16 @@ export function buildTaskPrompt(request: StartRequest, targetHost: "codex" | "cu
     );
   }
   if (targetHost === "cursor") {
-    parts.push("This task was delegated by Codex. Implement it directly; do NOT hand it back to Codex.");
+    parts.push(
+      "This task was delegated by Codex. Implement it directly; do NOT hand it back to Codex.",
+    );
   }
 
   const text = parts.join("\n");
-  if (request.origin?.handoffDepth && request.origin.handoffDepth > request.origin.maxHandoffDepth) {
+  if (
+    request.origin?.handoffDepth &&
+    request.origin.handoffDepth > request.origin.maxHandoffDepth
+  ) {
     // Should have been rejected earlier; belt-and-braces guard.
     throw new Error("handoff depth exceeded maximum");
   }

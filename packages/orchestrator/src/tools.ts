@@ -13,7 +13,7 @@ import {
   validateStartRequest,
   type StartRequest,
 } from "@codex-cursor-bridge/bridge-core";
-import { JobManager } from "./job-manager.js";
+import type { JobManager } from "./job-manager.js";
 
 export interface ToolResult {
   /** Structured machine-readable payload (returned as JSON to the host). */
@@ -35,25 +35,65 @@ export interface ToolDef {
 }
 
 const startSchemaProperties = {
-  task: { type: "string", minLength: 1, description: "The delegated task. State the problem, constraints, and expected deliverable precisely." },
-  cwd: { type: "string", minLength: 1, description: "Absolute path to the repository/working directory the agent should operate in." },
+  task: {
+    type: "string",
+    minLength: 1,
+    description:
+      "The delegated task. State the problem, constraints, and expected deliverable precisely.",
+  },
+  cwd: {
+    type: "string",
+    minLength: 1,
+    description:
+      "Absolute path to the repository/working directory the agent should operate in.",
+  },
   mode: {
     type: "string",
-    enum: ["investigate", "review", "adversarial-review", "rescue", "plan", "implement"],
-    description: "Delegation mode. investigate/review/adversarial-review/plan run read-only; implement requires a write profile.",
+    enum: [
+      "investigate",
+      "review",
+      "adversarial-review",
+      "rescue",
+      "plan",
+      "implement",
+    ],
+    description:
+      "Delegation mode. investigate/review/adversarial-review/plan run read-only; implement requires a write profile.",
   },
   permissionProfile: {
     type: "string",
     enum: ["read-only", "isolated-workspace-write", "current-workspace-write"],
-    description: "Write policy. read-only (default): agent cannot modify files. isolated-workspace-write: changes happen in a temporary git worktree. current-workspace-write: agent edits your current working tree (use sparingly).",
+    description:
+      "Write policy. read-only (default): agent cannot modify files. isolated-workspace-write: changes happen in a temporary git worktree. current-workspace-write: agent edits your current working tree (use sparingly).",
   },
-  background: { type: "boolean", description: "Start as a background job and return the job id immediately." },
-  model: { type: "string", description: "Optional model override. Omit to use the host's configured default." },
-  reasoningEffort: { type: "string", enum: ["low", "medium", "high", "xhigh"], description: "Optional reasoning effort when supported." },
-  baseRef: { type: "string", description: "Git base reference for worktree creation." },
+  background: {
+    type: "boolean",
+    description: "Start as a background job and return the job id immediately.",
+  },
+  model: {
+    type: "string",
+    description:
+      "Optional model override. Omit to use the host's configured default.",
+  },
+  reasoningEffort: {
+    type: "string",
+    enum: ["low", "medium", "high", "xhigh"],
+    description: "Optional reasoning effort when supported.",
+  },
+  baseRef: {
+    type: "string",
+    description: "Git base reference for worktree creation.",
+  },
   timeoutMs: { type: "integer", description: "Job timeout in milliseconds." },
-  constraints: { type: "array", items: { type: "string" }, description: "Constraints the delegated agent must respect." },
-  expectedOutput: { type: "string", description: "Description of the expected deliverable." },
+  constraints: {
+    type: "array",
+    items: { type: "string" },
+    description: "Constraints the delegated agent must respect.",
+  },
+  expectedOutput: {
+    type: "string",
+    description: "Description of the expected deliverable.",
+  },
   origin: {
     type: "object",
     description: "Recursion metadata (filled by the delegating host).",
@@ -67,7 +107,9 @@ const startSchemaProperties = {
   },
 } as const;
 
-function statusPayload(record: ReturnType<JobManager["get"]>): Record<string, unknown> {
+function statusPayload(
+  record: ReturnType<JobManager["get"]>,
+): Record<string, unknown> {
   return {
     jobId: record.jobId,
     status: record.status,
@@ -80,13 +122,23 @@ function statusPayload(record: ReturnType<JobManager["get"]>): Record<string, un
     startedAt: record.startedAt ?? null,
     finishedAt: record.finishedAt ?? null,
     deadlineAt: record.deadlineAt ?? null,
-    worktree: record.worktree ? { path: record.worktree.path, branch: record.worktree.branch, baseRef: record.worktree.baseRef } : null,
-    events: record.events.slice(-12).map((e: { ts: string; type: string }) => ({ ts: e.ts, type: e.type })),
+    worktree: record.worktree
+      ? {
+          path: record.worktree.path,
+          branch: record.worktree.branch,
+          baseRef: record.worktree.baseRef,
+        }
+      : null,
+    events: record.events
+      .slice(-12)
+      .map((e: { ts: string; type: string }) => ({ ts: e.ts, type: e.type })),
     hasResult: record.result != null,
   };
 }
 
-function resultPayload(record: ReturnType<JobManager["get"]>): Record<string, unknown> {
+function resultPayload(
+  record: ReturnType<JobManager["get"]>,
+): Record<string, unknown> {
   const r = record.result;
   if (!r) {
     return {
@@ -94,10 +146,18 @@ function resultPayload(record: ReturnType<JobManager["get"]>): Record<string, un
       status: record.status,
       nativeId: record.nativeId ?? null,
       result: null,
-      note: record.status === "running" ? "job still running; call status again later" : "no result recorded yet",
+      note:
+        record.status === "running"
+          ? "job still running; call status again later"
+          : "no result recorded yet",
     };
   }
-  return { jobId: record.jobId, status: record.status, nativeId: r.nativeId ?? record.nativeId ?? null, result: r };
+  return {
+    jobId: record.jobId,
+    status: record.status,
+    nativeId: r.nativeId ?? record.nativeId ?? null,
+    result: r,
+  };
 }
 
 export interface RouterOptions {
@@ -119,13 +179,22 @@ export function buildToolRouter(opts: RouterOptions): ToolDef[] {
       target === "codex"
         ? "Start a Codex job (investigate / review / adversarial-review / rescue / plan / implement) with sandboxing, background job management, and a persistent Codex thread id."
         : "Start a Cursor agent job (investigate / review / adversarial-review / rescue / plan / implement) with permission profiles, background job management, and a persistent Cursor session id.",
-    inputSchema: { type: "object", properties: { ...startSchemaProperties }, required: ["task", "cwd"], additionalProperties: false },
+    inputSchema: {
+      type: "object",
+      properties: { ...startSchemaProperties },
+      required: ["task", "cwd"],
+      additionalProperties: false,
+    },
     handler: async (args) => {
       const vr = validateStartRequest(args);
       if (!vr.ok) {
-        throw new BridgeError("BRIDGE_USAGE", `invalid ${target}_start arguments: ${vr.issues.map((i) => `${i.path}: ${i.message}`).join("; ")}`, {
-          details: vr.issues,
-        });
+        throw new BridgeError(
+          "BRIDGE_USAGE",
+          `invalid ${target}_start arguments: ${vr.issues.map((i) => `${i.path}: ${i.message}`).join("; ")}`,
+          {
+            details: vr.issues,
+          },
+        );
       }
       const request = vr.value as StartRequest;
       const enq = await manager.enqueue(request, {
@@ -135,7 +204,12 @@ export function buildToolRouter(opts: RouterOptions): ToolDef[] {
       });
       const result = await manager.run(enq.jobId);
       return {
-        payload: { jobId: result.jobId, nativeId: result.nativeId, status: result.status, result },
+        payload: {
+          jobId: result.jobId,
+          nativeId: result.nativeId,
+          status: result.status,
+          result,
+        },
         summary: `${target} job ${result.jobId} finished with status ${result.status}${result.nativeId ? ` (native id ${result.nativeId})` : ""}. ${redactString(result.summary.slice(0, 400))}`,
       };
     },
@@ -146,7 +220,12 @@ export function buildToolRouter(opts: RouterOptions): ToolDef[] {
     description: `Get the current status of a ${target} bridge job (state machine position, adapter, native session id, recent events).`,
     inputSchema: {
       type: "object",
-      properties: { jobId: { type: "string", description: "Bridge job id (job_...) returned by start." } },
+      properties: {
+        jobId: {
+          type: "string",
+          description: "Bridge job id (job_...) returned by start.",
+        },
+      },
       required: ["jobId"],
       additionalProperties: false,
     },
@@ -154,7 +233,10 @@ export function buildToolRouter(opts: RouterOptions): ToolDef[] {
       const jobId = String(args.jobId ?? "");
       const record = manager.get(jobId);
       const payload = statusPayload(record);
-      return { payload, summary: `job ${jobId}: ${record.status}${record.nativeId ? ` (native ${record.nativeId})` : ""}` };
+      return {
+        payload,
+        summary: `job ${jobId}: ${record.status}${record.nativeId ? ` (native ${record.nativeId})` : ""}`,
+      };
     },
   });
 
@@ -165,7 +247,11 @@ export function buildToolRouter(opts: RouterOptions): ToolDef[] {
       type: "object",
       properties: {
         jobId: { type: "string", description: "Bridge job id (job_...)." },
-        wait: { type: "boolean", description: "Not supported: results are only available once the job finishes. Use status to poll." },
+        wait: {
+          type: "boolean",
+          description:
+            "Not supported: results are only available once the job finishes. Use status to poll.",
+        },
       },
       required: ["jobId"],
       additionalProperties: false,
@@ -190,8 +276,14 @@ export function buildToolRouter(opts: RouterOptions): ToolDef[] {
     inputSchema: {
       type: "object",
       properties: {
-        jobId: { type: "string", description: "Bridge job id to follow up on." },
-        message: { type: "string", description: "Follow-up message for the native session." },
+        jobId: {
+          type: "string",
+          description: "Bridge job id to follow up on.",
+        },
+        message: {
+          type: "string",
+          description: "Follow-up message for the native session.",
+        },
       },
       required: ["jobId", "message"],
       additionalProperties: false,
@@ -199,14 +291,23 @@ export function buildToolRouter(opts: RouterOptions): ToolDef[] {
     handler: async (args) => {
       const jobId = String(args.jobId ?? "");
       const message = String(args.message ?? "");
-      if (message.trim().length === 0) throw new BridgeError("BRIDGE_USAGE", "message must be non-empty");
+      if (message.trim().length === 0)
+        throw new BridgeError("BRIDGE_USAGE", "message must be non-empty");
       const record = manager.get(jobId);
       if (!record.nativeId) {
-        return { payload: { jobId, accepted: false }, summary: `job ${jobId} has no native session id; cannot follow up` };
+        return {
+          payload: { jobId, accepted: false },
+          summary: `job ${jobId} has no native session id; cannot follow up`,
+        };
       }
       const res = await manager.reply(jobId, message);
       return {
-        payload: { jobId, nativeId: record.nativeId, accepted: res.accepted, note: res.note },
+        payload: {
+          jobId,
+          nativeId: record.nativeId,
+          accepted: res.accepted,
+          note: res.note,
+        },
         summary: res.accepted
           ? `follow-up queued for ${target} session ${record.nativeId}; run a follow-up job via the CLI to receive the answer`
           : `follow-up not accepted: ${res.note ?? "unsupported"}`,
@@ -226,19 +327,35 @@ export function buildToolRouter(opts: RouterOptions): ToolDef[] {
     handler: async (args) => {
       const jobId = String(args.jobId ?? "");
       const result = await manager.cancel(jobId);
-      return { payload: { jobId, status: result.status, nativeId: result.nativeId }, summary: `job ${jobId} cancelled` };
+      return {
+        payload: { jobId, status: result.status, nativeId: result.nativeId },
+        summary: `job ${jobId} cancelled`,
+      };
     },
   });
 
   const makeList = (): ToolDef => ({
     name: `${target}_list`,
     description: `List recent ${target} bridge jobs with status and native session ids.`,
-    inputSchema: { type: "object", properties: { limit: { type: "integer", description: "Max jobs to return (default 20)." } }, additionalProperties: false },
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: {
+          type: "integer",
+          description: "Max jobs to return (default 20).",
+        },
+      },
+      additionalProperties: false,
+    },
     handler: async (args) => {
       const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 100);
       const jobs = manager
         .list()
-        .filter((j) => (opts.originHost === "cursor" ? j.targetHost === "codex" : j.targetHost === "cursor"))
+        .filter((j) =>
+          opts.originHost === "cursor"
+            ? j.targetHost === "codex"
+            : j.targetHost === "cursor",
+        )
         .slice(-limit)
         .reverse()
         .map((j) => ({
@@ -254,14 +371,24 @@ export function buildToolRouter(opts: RouterOptions): ToolDef[] {
     },
   });
 
-  return [makeStart(), makeStatus(), makeResult(), makeReply(), makeCancel(), makeList()];
+  return [
+    makeStart(),
+    makeStatus(),
+    makeResult(),
+    makeReply(),
+    makeCancel(),
+    makeList(),
+  ];
 }
 
 /** Wrap a tool handler into safe MCP responses (never throws into the transport). */
 export async function invokeToolSafe(
   tool: ToolDef,
   args: Record<string, unknown>,
-): Promise<{ ok: true; payload: unknown; summary: string } | { ok: false; code: string; message: string }> {
+): Promise<
+  | { ok: true; payload: unknown; summary: string }
+  | { ok: false; code: string; message: string }
+> {
   try {
     const res = await tool.handler(args);
     return { ok: true, payload: res.payload, summary: res.summary };

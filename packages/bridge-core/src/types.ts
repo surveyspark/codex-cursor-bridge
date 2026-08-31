@@ -132,7 +132,10 @@ export interface JobResult {
   warnings?: string[];
   blockers?: string[];
   residualRisks?: string[];
-  artifacts?: Array<{ path: string; kind: "patch" | "log" | "plan" | "report" | "other" }>;
+  artifacts?: Array<{
+    path: string;
+    kind: "patch" | "log" | "plan" | "report" | "other";
+  }>;
   continuation: Continuation;
   startedAt?: string | null;
   finishedAt?: string | null;
@@ -249,7 +252,9 @@ export interface BridgeConfig {
   completedRetentionDays: number;
   worktreeRoot?: string;
   defaultPermissionProfile: PermissionProfile;
-  defaultImplementProfile: "isolated-workspace-write" | "current-workspace-write";
+  defaultImplementProfile:
+    | "isolated-workspace-write"
+    | "current-workspace-write";
   defaultModel?: string | null;
   defaultReasoningEffort?: "low" | "medium" | "high" | "xhigh" | null;
   networkPolicy: NetworkPolicy;

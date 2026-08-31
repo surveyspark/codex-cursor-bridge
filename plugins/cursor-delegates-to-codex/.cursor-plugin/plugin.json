@@ -7,13 +7,7 @@
   },
   "repository": "https://github.com/surveyspark/codex-cursor-bridge",
   "license": "Apache-2.0",
-  "keywords": [
-    "codex",
-    "delegation",
-    "review",
-    "debugging",
-    "handoff"
-  ],
+  "keywords": ["codex", "delegation", "review", "debugging", "handoff"],
   "skills": "./skills/",
   "commands": "./commands/",
   "mcp": {

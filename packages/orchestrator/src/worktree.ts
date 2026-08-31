@@ -36,7 +36,9 @@ export interface GitInfo {
 
 export async function gitVersion(): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync("git", ["--version"], { timeout: 10_000 });
+    const { stdout } = await execFileAsync("git", ["--version"], {
+      timeout: 10_000,
+    });
     return stdout.trim().replace(/^git version\s*/, "");
   } catch {
     return null;
@@ -54,7 +56,11 @@ export async function inspectGit(cwd: string): Promise<GitInfo> {
     dirty: false,
   };
   try {
-    const { stdout } = await execFileAsync("git", ["rev-parse", "--show-toplevel"], { cwd, timeout: 10_000 });
+    const { stdout } = await execFileAsync(
+      "git",
+      ["rev-parse", "--show-toplevel"],
+      { cwd, timeout: 10_000 },
+    );
     info.isGit = true;
     info.root = canonicalize(stdout.trim());
   } catch {
@@ -67,13 +73,20 @@ export async function inspectGit(cwd: string): Promise<GitInfo> {
     info.hasCommits = false;
   }
   try {
-    const { stdout } = await execFileAsync("git", ["branch", "--show-current"], { cwd, timeout: 10_000 });
+    const { stdout } = await execFileAsync(
+      "git",
+      ["branch", "--show-current"],
+      { cwd, timeout: 10_000 },
+    );
     info.branch = stdout.trim() || null;
   } catch {
     info.branch = null;
   }
   try {
-    const { stdout } = await execFileAsync("git", ["status", "--porcelain"], { cwd, timeout: 15_000 });
+    const { stdout } = await execFileAsync("git", ["status", "--porcelain"], {
+      cwd,
+      timeout: 15_000,
+    });
     info.dirty = stdout.trim().length > 0;
   } catch {
     info.dirty = false;
@@ -90,10 +103,15 @@ export interface CreateWorktreeOptions {
   branchPrefix?: string;
 }
 
-export async function createWorktree(opts: CreateWorktreeOptions): Promise<WorktreeCreated> {
+export async function createWorktree(
+  opts: CreateWorktreeOptions,
+): Promise<WorktreeCreated> {
   const info = await inspectGit(opts.repoRoot);
   if (!info.isGit || !info.root) {
-    throw new BridgeError("WORKTREE_CREATE_FAILED", "repository is not a git work tree; worktree isolation unavailable");
+    throw new BridgeError(
+      "WORKTREE_CREATE_FAILED",
+      "repository is not a git work tree; worktree isolation unavailable",
+    );
   }
   if (!info.hasCommits) {
     throw new BridgeError(
@@ -107,13 +125,20 @@ export async function createWorktree(opts: CreateWorktreeOptions): Promise<Workt
   let baseRef = opts.baseRef ?? info.branch ?? "HEAD";
   // Validate the ref resolves (no injection risk: argument array, and we verify)
   try {
-    await execFileAsync("git", ["rev-parse", "--verify", "--quiet", `${baseRef}^{commit}`], {
-      cwd: opts.repoRoot,
-      timeout: 10_000,
-    });
+    await execFileAsync(
+      "git",
+      ["rev-parse", "--verify", "--quiet", `${baseRef}^{commit}`],
+      {
+        cwd: opts.repoRoot,
+        timeout: 10_000,
+      },
+    );
   } catch {
     if (opts.baseRef) {
-      throw new BridgeError("WORKTREE_CREATE_FAILED", `base ref "${opts.baseRef}" does not resolve to a commit`);
+      throw new BridgeError(
+        "WORKTREE_CREATE_FAILED",
+        `base ref "${opts.baseRef}" does not resolve to a commit`,
+      );
     }
     baseRef = "HEAD";
   }
@@ -123,8 +148,16 @@ export async function createWorktree(opts: CreateWorktreeOptions): Promise<Workt
   const branch = `${opts.branchPrefix ?? "bridge"}${"/"}${repoName}-${short}`;
   const wtPath = path.join(opts.worktreeRoot, `${repoName}-${short}`);
 
-  if (fs.existsSync(wtPath) || fs.existsSync(path.join(info.root, ".git", "worktrees", path.basename(wtPath)))) {
-    throw new BridgeError("WORKTREE_EXISTS", `worktree path already exists: ${wtPath}`);
+  if (
+    fs.existsSync(wtPath) ||
+    fs.existsSync(
+      path.join(info.root, ".git", "worktrees", path.basename(wtPath)),
+    )
+  ) {
+    throw new BridgeError(
+      "WORKTREE_EXISTS",
+      `worktree path already exists: ${wtPath}`,
+    );
   }
 
   try {
@@ -134,15 +167,25 @@ export async function createWorktree(opts: CreateWorktreeOptions): Promise<Workt
       { cwd: opts.repoRoot, timeout: 60_000 },
     );
     // Try to create a named branch for the result.
-    await execFileAsync("git", ["checkout", "-b", branch], { cwd: wtPath, timeout: 30_000 });
+    await execFileAsync("git", ["checkout", "-b", branch], {
+      cwd: wtPath,
+      timeout: 30_000,
+    });
   } catch (err) {
     // Roll back partial creation.
     try {
-      await execFileAsync("git", ["worktree", "remove", "--force", wtPath], { cwd: opts.repoRoot, timeout: 30_000 });
+      await execFileAsync("git", ["worktree", "remove", "--force", wtPath], {
+        cwd: opts.repoRoot,
+        timeout: 30_000,
+      });
     } catch {
       /* best effort */
     }
-    throw new BridgeError("WORKTREE_CREATE_FAILED", `git worktree add failed: ${(err as Error).message}`, { cause: err });
+    throw new BridgeError(
+      "WORKTREE_CREATE_FAILED",
+      `git worktree add failed: ${(err as Error).message}`,
+      { cause: err },
+    );
   }
 
   return { path: wtPath, branch, baseRef, created: true };
@@ -153,7 +196,10 @@ export interface WorktreeDiffSummary {
   insertions: number;
   deletions: number;
   patchPath: string | null;
-  files: Array<{ path: string; change: "added" | "modified" | "deleted" | "renamed" }>;
+  files: Array<{
+    path: string;
+    change: "added" | "modified" | "deleted" | "renamed";
+  }>;
 }
 
 /** Collect diff vs base ref inside a worktree; writes a patch artifact into .handoff/. */
@@ -162,15 +208,25 @@ export async function collectWorktreeDiff(
   repoRoot: string,
   maxOutputBytes: number,
 ): Promise<WorktreeDiffSummary> {
-  const empty: WorktreeDiffSummary = { filesChanged: 0, insertions: 0, deletions: 0, patchPath: null, files: [] };
+  const empty: WorktreeDiffSummary = {
+    filesChanged: 0,
+    insertions: 0,
+    deletions: 0,
+    patchPath: null,
+    files: [],
+  };
   try {
     // Include untracked files in the stat by adding intent-to-add? Never touch
     // the index destructively; use status + numstat instead.
-    const numstat = await execFileAsync("git", ["diff", "--numstat", wt.baseRef], {
-      cwd: wt.path,
-      timeout: 30_000,
-      maxBuffer: 32 * 1024 * 1024,
-    });
+    const numstat = await execFileAsync(
+      "git",
+      ["diff", "--numstat", wt.baseRef],
+      {
+        cwd: wt.path,
+        timeout: 30_000,
+        maxBuffer: 32 * 1024 * 1024,
+      },
+    );
     const status = await execFileAsync("git", ["status", "--porcelain"], {
       cwd: wt.path,
       timeout: 30_000,
@@ -187,12 +243,13 @@ export async function collectWorktreeDiff(
     for (const line of status.stdout.split("\n")) {
       if (!line.startsWith("??")) continue;
       const file = line.slice(3).trim().replace(/^"|"$/, "");
-      if (file && !files.some((f) => f.path === file)) files.push({ path: file, change: "added" });
+      if (file && !files.some((f) => f.path === file))
+        files.push({ path: file, change: "added" });
     }
     let insertions = 0;
     let deletions = 0;
     for (const line of numstat.stdout.split("\n")) {
-      const m = /^(\d+|\-)\t(\d+|\-)\t/.exec(line);
+      const m = /^(\d+|-)\t(\d+|-)\t/.exec(line);
       if (m) {
         insertions += m[1] === "-" ? 0 : parseInt(m[1]!, 10);
         deletions += m[2] === "-" ? 0 : parseInt(m[2]!, 10);
@@ -201,14 +258,19 @@ export async function collectWorktreeDiff(
     // Export patch into the project's .handoff directory.
     let patchPath: string | null = null;
     try {
-      const { stdout: diffOut } = await execFileAsync("git", ["diff", wt.baseRef], {
-        cwd: wt.path,
-        timeout: 60_000,
-        maxBuffer: 1024 * 1024 * 1024,
-      });
+      const { stdout: diffOut } = await execFileAsync(
+        "git",
+        ["diff", wt.baseRef],
+        {
+          cwd: wt.path,
+          timeout: 60_000,
+          maxBuffer: 1024 * 1024 * 1024,
+        },
+      );
       const truncated =
         Buffer.byteLength(diffOut, "utf8") > maxOutputBytes
-          ? diffOut.slice(0, maxOutputBytes) + "\n…[truncated by maxOutputBytes]"
+          ? diffOut.slice(0, maxOutputBytes) +
+            "\n…[truncated by maxOutputBytes]"
           : diffOut;
       if (truncated.trim().length > 0) {
         const handoff = path.join(repoRoot, ".handoff");
@@ -233,8 +295,14 @@ export async function collectWorktreeDiff(
 }
 
 /** Remove a worktree (explicit cleanup path only). */
-export async function removeWorktree(repoRoot: string, wtPath: string): Promise<void> {
-  await execFileAsync("git", ["worktree", "remove", wtPath], { cwd: repoRoot, timeout: 60_000 });
+export async function removeWorktree(
+  repoRoot: string,
+  wtPath: string,
+): Promise<void> {
+  await execFileAsync("git", ["worktree", "remove", wtPath], {
+    cwd: repoRoot,
+    timeout: 60_000,
+  });
 }
 
 /** Parse `git diff --numstat` style summary for the current tree (non-worktree runs). */
@@ -243,19 +311,28 @@ export async function collectCurrentDiffSummary(
   baseRef: string | null,
   maxOutputBytes: number,
 ): Promise<WorktreeDiffSummary> {
-  const args = baseRef ? ["diff", "--numstat", baseRef] : ["diff", "--numstat", "HEAD"];
+  const args = baseRef
+    ? ["diff", "--numstat", baseRef]
+    : ["diff", "--numstat", "HEAD"];
   try {
-    const { stdout } = await execFileAsync("git", args, { cwd: repoRoot, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 });
+    const { stdout } = await execFileAsync("git", args, {
+      cwd: repoRoot,
+      timeout: 30_000,
+      maxBuffer: 32 * 1024 * 1024,
+    });
     let insertions = 0;
     let deletions = 0;
     for (const line of stdout.split("\n")) {
-      const m = /^(\d+|\-)\t(\d+|\-)\t/.exec(line);
+      const m = /^(\d+|-)\t(\d+|-)\t/.exec(line);
       if (m) {
         insertions += m[1] === "-" ? 0 : parseInt(m[1]!, 10);
         deletions += m[2] === "-" ? 0 : parseInt(m[2]!, 10);
       }
     }
-    const status = await execFileAsync("git", ["status", "--porcelain"], { cwd: repoRoot, timeout: 30_000 });
+    const status = await execFileAsync("git", ["status", "--porcelain"], {
+      cwd: repoRoot,
+      timeout: 30_000,
+    });
     const files = status.stdout
       .split("\n")
       .filter((l) => l.trim().length >= 4)
@@ -268,9 +345,21 @@ export async function collectCurrentDiffSummary(
               ? ("deleted" as const)
               : ("modified" as const),
       }));
-    return { filesChanged: files.length, insertions, deletions, patchPath: null, files: files.slice(0, 500) };
+    return {
+      filesChanged: files.length,
+      insertions,
+      deletions,
+      patchPath: null,
+      files: files.slice(0, 500),
+    };
   } catch {
-    return { filesChanged: 0, insertions: 0, deletions: 0, patchPath: null, files: [] };
+    return {
+      filesChanged: 0,
+      insertions: 0,
+      deletions: 0,
+      patchPath: null,
+      files: [],
+    };
   }
   void maxOutputBytes;
 }

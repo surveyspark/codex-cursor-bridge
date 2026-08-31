@@ -19,6 +19,6 @@
 - [ ] `npm run typecheck` passes
 - [ ] `npm test` passes locally
 - [ ] Tests added/updated for the change
-- [ ] Docs updated (README/docs/*) when behavior changed
+- [ ] Docs updated (README/docs/\*) when behavior changed
 - [ ] No secrets, personal paths, or large artifacts committed
 - [ ] Security-relevant changes documented in `docs/security-model.md`

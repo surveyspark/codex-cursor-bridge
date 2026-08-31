@@ -34,18 +34,39 @@ export interface CursorAdapterSetOptions {
 
 export async function selectCursorAdapter(
   opts: CursorAdapterSetOptions,
-): Promise<{ adapter: AgentAdapter; selectionReason: string; allStatuses: Record<string, AdapterAvailability> }> {
+): Promise<{
+  adapter: AgentAdapter;
+  selectionReason: string;
+  allStatuses: Record<string, AdapterAvailability>;
+}> {
   const statuses: Record<string, AdapterAvailability> = {};
   const preferred = opts.config.preferredCursorAdapter;
 
-  const candidates: Array<{ key: "sdk" | "acp" | "cli-fallback"; make: () => AgentAdapter }> = [
+  const candidates: Array<{
+    key: "sdk" | "acp" | "cli-fallback";
+    make: () => AgentAdapter;
+  }> = [
     { key: "sdk", make: () => opts.overrides?.sdk ?? new CursorSdkAdapter() },
-    { key: "acp", make: () => opts.overrides?.acp ?? new CursorAcpAdapter({ ...(opts.cursorBinaryPath ? { cursorBinaryPath: opts.cursorBinaryPath } : {}) }) },
+    {
+      key: "acp",
+      make: () =>
+        opts.overrides?.acp ??
+        new CursorAcpAdapter({
+          ...(opts.cursorBinaryPath
+            ? { cursorBinaryPath: opts.cursorBinaryPath }
+            : {}),
+        }),
+    },
     {
       key: "cli-fallback",
       make: () =>
         opts.overrides?.["cli-fallback"] ??
-        new CursorCliFallbackAdapter({ ...(opts.cursorBinaryPath ? { cursorBinaryPath: opts.cursorBinaryPath } : {}), allowNonInteractive: opts.config.allowNonInteractiveCliFallback }),
+        new CursorCliFallbackAdapter({
+          ...(opts.cursorBinaryPath
+            ? { cursorBinaryPath: opts.cursorBinaryPath }
+            : {}),
+          allowNonInteractive: opts.config.allowNonInteractiveCliFallback,
+        }),
     },
   ];
 
@@ -53,7 +74,10 @@ export async function selectCursorAdapter(
   const ordered =
     preferred === "auto"
       ? candidates
-      : [...candidates.filter((c) => c.key === preferred), ...candidates.filter((c) => c.key !== preferred)];
+      : [
+          ...candidates.filter((c) => c.key === preferred),
+          ...candidates.filter((c) => c.key !== preferred),
+        ];
 
   const probeCache = new Map<string, AdapterAvailability>();
   for (const candidate of ordered) {
@@ -91,13 +115,22 @@ export async function selectCursorAdapter(
       );
     }
   }
-  throw new BridgeError("ADAPTER_NOT_AVAILABLE", "no Cursor adapter available (tried sdk, acp, cli-fallback)", {
-    details: statuses,
-  });
+  throw new BridgeError(
+    "ADAPTER_NOT_AVAILABLE",
+    "no Cursor adapter available (tried sdk, acp, cli-fallback)",
+    {
+      details: statuses,
+    },
+  );
 }
 
 export { CursorSdkAdapter } from "./sdk.js";
 export { CursorAcpAdapter } from "./acp.js";
 export { CursorCliFallbackAdapter } from "./cli-fallback.js";
 export { buildTaskPrompt } from "./prompt.js";
-export type { AdapterAvailability, AgentAdapter, AdapterCapabilities, AdapterRunContext } from "./types.js";
+export type {
+  AdapterAvailability,
+  AgentAdapter,
+  AdapterCapabilities,
+  AdapterRunContext,
+} from "./types.js";

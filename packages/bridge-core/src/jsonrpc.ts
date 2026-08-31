@@ -90,7 +90,10 @@ export interface JsonRpcResponse {
   error?: { code: number; message: string; data?: unknown };
 }
 
-export type JsonRpcMessage = JsonRpcRequest | JsonRpcNotification | JsonRpcResponse;
+export type JsonRpcMessage =
+  | JsonRpcRequest
+  | JsonRpcNotification
+  | JsonRpcResponse;
 
 export function isResponse(msg: JsonRpcMessage): msg is JsonRpcResponse {
   return "id" in msg && !("method" in msg);
@@ -100,7 +103,9 @@ export function isRequest(msg: JsonRpcMessage): msg is JsonRpcRequest {
   return "method" in msg && "id" in msg;
 }
 
-export function isNotification(msg: JsonRpcMessage): msg is JsonRpcNotification {
+export function isNotification(
+  msg: JsonRpcMessage,
+): msg is JsonRpcNotification {
   return "method" in msg && !("id" in msg);
 }
 
@@ -113,7 +118,11 @@ export class JsonRpcConnection {
   private nextId = 1;
   private readonly pending = new Map<
     number | string,
-    { resolve: (v: unknown) => void; reject: (e: BridgeError) => void; timer: NodeJS.Timeout | null }
+    {
+      resolve: (v: unknown) => void;
+      reject: (e: BridgeError) => void;
+      timer: NodeJS.Timeout | null;
+    }
   >();
   private closed = false;
 
@@ -149,9 +158,13 @@ export class JsonRpcConnection {
       if (entry.timer) clearTimeout(entry.timer);
       if (msg.error) {
         entry.reject(
-          new BridgeError("ADAPTER_PROTOCOL_ERROR", `JSON-RPC error ${msg.error.code}: ${msg.error.message}`, {
-            details: msg.error,
-          }),
+          new BridgeError(
+            "ADAPTER_PROTOCOL_ERROR",
+            `JSON-RPC error ${msg.error.code}: ${msg.error.message}`,
+            {
+              details: msg.error,
+            },
+          ),
         );
       } else {
         entry.resolve(msg.result);
@@ -167,13 +180,20 @@ export class JsonRpcConnection {
     void (async () => {
       try {
         const result = await this.opts.onServerRequest(serverRequest);
-        this.sendRaw({ jsonrpc: "2.0", id: serverRequest.id, result: result ?? {} });
+        this.sendRaw({
+          jsonrpc: "2.0",
+          id: serverRequest.id,
+          result: result ?? {},
+        });
       } catch (err) {
         const be = err as { code?: number; message?: string };
         this.sendRaw({
           jsonrpc: "2.0",
           id: serverRequest.id,
-          error: { code: be.code ?? -32603, message: be.message ?? "internal error" },
+          error: {
+            code: be.code ?? -32603,
+            message: be.message ?? "internal error",
+          },
         });
       }
     })();
@@ -190,13 +210,23 @@ export class JsonRpcConnection {
   }
 
   notify(method: string, params?: unknown): void {
-    const msg: JsonRpcNotification = { jsonrpc: "2.0", method, ...(params !== undefined ? { params } : {}) };
+    const msg: JsonRpcNotification = {
+      jsonrpc: "2.0",
+      method,
+      ...(params !== undefined ? { params } : {}),
+    };
     this.sendRaw(msg);
   }
 
-  request(method: string, params?: unknown, timeoutMs?: number): Promise<unknown> {
+  request(
+    method: string,
+    params?: unknown,
+    timeoutMs?: number,
+  ): Promise<unknown> {
     if (this.closed) {
-      return Promise.reject(new BridgeError("ADAPTER_PROTOCOL_ERROR", "connection closed"));
+      return Promise.reject(
+        new BridgeError("ADAPTER_PROTOCOL_ERROR", "connection closed"),
+      );
     }
     const id = this.nextId++;
     const timeout = timeoutMs ?? this.opts.requestTimeoutMs ?? 120_000;
@@ -205,15 +235,31 @@ export class JsonRpcConnection {
         timeout > 0
           ? setTimeout(() => {
               this.pending.delete(id);
-              reject(new BridgeError("ADAPTER_TIMEOUT", `request ${method} timed out after ${timeout}ms`));
+              reject(
+                new BridgeError(
+                  "ADAPTER_TIMEOUT",
+                  `request ${method} timed out after ${timeout}ms`,
+                ),
+              );
             }, timeout)
           : null;
       this.pending.set(id, {
-        resolve: (v) => { if (timer) clearTimeout(timer); resolve(v); },
-        reject: (e) => { if (timer) clearTimeout(timer); reject(e); },
+        resolve: (v) => {
+          if (timer) clearTimeout(timer);
+          resolve(v);
+        },
+        reject: (e) => {
+          if (timer) clearTimeout(timer);
+          reject(e);
+        },
         timer,
       });
-      this.sendRaw({ jsonrpc: "2.0", id, method, ...(params !== undefined ? { params } : {}) });
+      this.sendRaw({
+        jsonrpc: "2.0",
+        id,
+        method,
+        ...(params !== undefined ? { params } : {}),
+      });
     });
   }
 
@@ -223,7 +269,13 @@ export class JsonRpcConnection {
     this.closed = true;
     for (const [id, entry] of this.pending) {
       if (entry.timer) clearTimeout(entry.timer);
-      entry.reject(new BridgeError("ADAPTER_PROTOCOL_ERROR", "connection closed with request pending", { details: { id } }));
+      entry.reject(
+        new BridgeError(
+          "ADAPTER_PROTOCOL_ERROR",
+          "connection closed with request pending",
+          { details: { id } },
+        ),
+      );
       this.pending.delete(id);
     }
     this.opts.onClose?.();

@@ -43,7 +43,7 @@ likelihood; recommended mitigations.
 
 ## rescue
 
-Use after 2+ failed implementation attempts. Send the *approaches*, not logs.
+Use after 2+ failed implementation attempts. Send the _approaches_, not logs.
 
 Task template:
 

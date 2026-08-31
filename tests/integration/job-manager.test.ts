@@ -19,7 +19,11 @@ afterAll(() => {
 });
 
 function makeManager(repoRoot: string, scratch: string) {
-  const fakeCodex = materializeFake(scratch, "fake-codex.cjs", fakeCodexAppServer({}));
+  const fakeCodex = materializeFake(
+    scratch,
+    "fake-codex.cjs",
+    fakeCodexAppServer({}),
+  );
   const fakeAcp = materializeFake(scratch, "fake-acp.cjs", fakeCursorAcp({}));
   return new JobManager({
     repoRoot,
@@ -27,11 +31,18 @@ function makeManager(repoRoot: string, scratch: string) {
     selectAdapter: async (_req, record) => {
       if (record.targetHost === "codex") {
         return {
-          adapter: new CodexAppServerAdapter({ argvOverride: [process.execPath, fakeCodex] }),
+          adapter: new CodexAppServerAdapter({
+            argvOverride: [process.execPath, fakeCodex],
+          }),
           reason: "fake",
         };
       }
-      return { adapter: new CursorAcpAdapter({ argvOverride: [process.execPath, fakeAcp] }), reason: "fake" };
+      return {
+        adapter: new CursorAcpAdapter({
+          argvOverride: [process.execPath, fakeAcp],
+        }),
+        reason: "fake",
+      };
     },
   });
 }
@@ -63,7 +74,9 @@ describe("job manager integration", () => {
   }, 30_000);
 
   it("runs an implement job in an isolated worktree and produces a patch", async () => {
-    const { repo, cleanup } = await makeTempRepo({ files: { "src/app.ts": "export const a = 1;\n" } });
+    const { repo, cleanup } = await makeTempRepo({
+      files: { "src/app.ts": "export const a = 1;\n" },
+    });
     cleanups.push(cleanup);
     process.env.CCB_STATE_DIR = path.join(repo, ".state");
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-int-"));
@@ -74,7 +87,12 @@ describe("job manager integration", () => {
       config: { worktreeRoot: path.join(scratch, "worktrees") },
       selectAdapter: async (_req, record) => {
         expect(record.targetHost).toBe("cursor");
-        return { adapter: new CursorAcpAdapter({ argvOverride: [process.execPath, fakeAcp] }), reason: "fake" };
+        return {
+          adapter: new CursorAcpAdapter({
+            argvOverride: [process.execPath, fakeAcp],
+          }),
+          reason: "fake",
+        };
       },
     });
     const enq = await manager.enqueue(
@@ -95,7 +113,9 @@ describe("job manager integration", () => {
     // The real repo working tree was not modified by the agent.
     const { execFile } = await import("node:child_process");
     const { promisify } = await import("node:util");
-    const status = await promisify(execFile)("git", ["status", "--porcelain"], { cwd: repo });
+    const status = await promisify(execFile)("git", ["status", "--porcelain"], {
+      cwd: repo,
+    });
     expect(status.stdout.trim()).toBe("");
   }, 40_000);
 
@@ -128,21 +148,36 @@ describe("job manager integration", () => {
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-int-"));
     cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
     // Delayed fake: turn never finishes during the test window.
-    const fakeSlow = materializeFake(scratch, "fake-slow.cjs", fakeCodexAppServer({ turnDelayMs: 60_000 }));
+    const fakeSlow = materializeFake(
+      scratch,
+      "fake-slow.cjs",
+      fakeCodexAppServer({ turnDelayMs: 60_000 }),
+    );
     const manager = new JobManager({
       repoRoot: repo,
       config: { worktreeRoot: path.join(scratch, "worktrees") },
       selectAdapter: async () => ({
-        adapter: new CodexAppServerAdapter({ argvOverride: [process.execPath, fakeSlow] }),
+        adapter: new CodexAppServerAdapter({
+          argvOverride: [process.execPath, fakeSlow],
+        }),
         reason: "fake slow",
       }),
     });
     const enq = await manager.enqueue(
-      { task: "long task", cwd: repo, mode: "investigate", permissionProfile: "read-only", background: false },
+      {
+        task: "long task",
+        cwd: repo,
+        mode: "investigate",
+        permissionProfile: "read-only",
+        background: false,
+      },
       { host: "cursor", tool: "codex_start" },
     );
     const runPromise = manager.run(enq.jobId);
-    setTimeout(() => void manager.cancel(enq.jobId, "test cancel").catch(() => {}), 500);
+    setTimeout(
+      () => void manager.cancel(enq.jobId, "test cancel").catch(() => {}),
+      500,
+    );
     const result = await runPromise;
     expect(result.status).toBe("cancelled");
     expect(result.failure?.code).toBe("JOB_CANCELLED");
@@ -196,7 +231,12 @@ describe("job manager integration", () => {
     const manager = new JobManager({
       repoRoot: repo,
       config: { worktreeRoot: path.join(scratch, "worktrees") },
-      selectAdapter: async () => ({ adapter: new CursorAcpAdapter({ argvOverride: [process.execPath, fakeAcp] }), reason: "fake" }),
+      selectAdapter: async () => ({
+        adapter: new CursorAcpAdapter({
+          argvOverride: [process.execPath, fakeAcp],
+        }),
+        reason: "fake",
+      }),
     });
     const enq = await manager.enqueue(
       {

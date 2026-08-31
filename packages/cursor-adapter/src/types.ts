@@ -32,7 +32,11 @@ export interface AgentAdapter {
   readonly name: AdapterName;
   isAvailable(): Promise<AdapterAvailability>;
   run(request: StartRequest, ctx: AdapterRunContext): Promise<JobResult>;
-  reply?(nativeId: string, message: string, ctx: AdapterRunContext): Promise<JobResult>;
+  reply?(
+    nativeId: string,
+    message: string,
+    ctx: AdapterRunContext,
+  ): Promise<JobResult>;
   cancel?(nativeId: string): Promise<boolean>;
   describeCapabilities(): AdapterCapabilities;
 }

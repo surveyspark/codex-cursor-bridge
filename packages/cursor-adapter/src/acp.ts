@@ -27,7 +27,12 @@ import {
 } from "@codex-cursor-bridge/bridge-core";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { AdapterAvailability, AdapterCapabilities, AdapterRunContext, AgentAdapter } from "./types.js";
+import type {
+  AdapterAvailability,
+  AdapterCapabilities,
+  AdapterRunContext,
+  AgentAdapter,
+} from "./types.js";
 import { buildTaskPrompt } from "./prompt.js";
 
 const execFileAsync = promisify(execFile);
@@ -48,15 +53,23 @@ export class CursorAcpAdapter implements AgentAdapter {
 
   private argvBase(): string[] {
     if (this.opts.argvOverride) return this.opts.argvOverride;
-    const bin = this.opts.cursorBinaryPath ?? process.env.CCB_CURSOR_BINARY ?? "cursor-agent";
+    const bin =
+      this.opts.cursorBinaryPath ??
+      process.env.CCB_CURSOR_BINARY ??
+      "cursor-agent";
     return [bin, "acp"];
   }
 
   async cursorCliVersion(): Promise<string | null> {
     if (this.opts.argvOverride) return "test-fake";
-    const bin = this.opts.cursorBinaryPath ?? process.env.CCB_CURSOR_BINARY ?? "cursor-agent";
+    const bin =
+      this.opts.cursorBinaryPath ??
+      process.env.CCB_CURSOR_BINARY ??
+      "cursor-agent";
     try {
-      const { stdout } = await execFileAsync(bin, ["--version"], { timeout: 10_000 });
+      const { stdout } = await execFileAsync(bin, ["--version"], {
+        timeout: 10_000,
+      });
       return stdout.trim();
     } catch {
       return null;
@@ -64,10 +77,15 @@ export class CursorAcpAdapter implements AgentAdapter {
   }
 
   async isAvailable(): Promise<AdapterAvailability> {
-    if (this.opts.argvOverride) return { available: true, version: "test-fake" };
+    if (this.opts.argvOverride)
+      return { available: true, version: "test-fake" };
     const version = await this.cursorCliVersion();
     if (!version) {
-      return { available: false, reason: "cursor-agent CLI not found on PATH (install: npm i -g cursor-agent)" };
+      return {
+        available: false,
+        reason:
+          "cursor-agent CLI not found on PATH (install: npm i -g cursor-agent)",
+      };
     }
     return { available: true, version };
   }
@@ -78,8 +96,19 @@ export class CursorAcpAdapter implements AgentAdapter {
       continuation: true,
       structuredEvents: true,
       approvals: "relayed",
-      sandboxProfiles: ["read-only", "isolated-workspace-write", "current-workspace-write"],
-      modes: ["investigate", "review", "adversarial-review", "rescue", "plan", "implement"],
+      sandboxProfiles: [
+        "read-only",
+        "isolated-workspace-write",
+        "current-workspace-write",
+      ],
+      modes: [
+        "investigate",
+        "review",
+        "adversarial-review",
+        "rescue",
+        "plan",
+        "implement",
+      ],
     };
   }
 
@@ -111,7 +140,12 @@ export class CursorAcpAdapter implements AgentAdapter {
       argv: this.argvBase(),
       env: buildChildEnv(["CURSOR_API_KEY"]),
       onStdoutLine: (line) => reader.push(line),
-      onStderrLine: (line) => ctx.emit({ type: "cursor-acp.stderr", level: "debug", data: { line: redactString(line) } }),
+      onStderrLine: (line) =>
+        ctx.emit({
+          type: "cursor-acp.stderr",
+          level: "debug",
+          data: { line: redactString(line) },
+        }),
       abortSignal: ctx.abortSignal,
     });
     args.spawned(child);
@@ -127,23 +161,34 @@ export class CursorAcpAdapter implements AgentAdapter {
           const update = params.update as Record<string, unknown> | undefined;
           if (update?.sessionUpdate === "agent_message_chunk") {
             const content = update.content as { text?: string } | undefined;
-            if (content && typeof content.text === "string") finalText += content.text;
+            if (content && typeof content.text === "string")
+              finalText += content.text;
           }
         }
       },
       onServerRequest: async (msg) => {
         if (msg.method === "session/request_permission") {
           const params = (msg.params ?? {}) as Record<string, unknown>;
-          const options = (params.options as Array<{ kind?: string; optionId?: string }>) ?? [];
-          const denyOption = options.find((o) => o.kind === "reject_once") ?? options.at(-1);
+          const options =
+            (params.options as Array<{ kind?: string; optionId?: string }>) ??
+            [];
+          const denyOption =
+            options.find((o) => o.kind === "reject_once") ?? options.at(-1);
           ctx.approval({
             ts: new Date().toISOString(),
             kind: "session/request_permission",
-            summary: redactString(JSON.stringify(params.options ?? {}).slice(0, 500)),
+            summary: redactString(
+              JSON.stringify(params.options ?? {}).slice(0, 500),
+            ),
             decision: "auto-denied",
             reason: "bridge policy: permission escalations are denied",
           });
-          return { outcome: { outcome: "selected", optionId: denyOption?.optionId ?? null } };
+          return {
+            outcome: {
+              outcome: "selected",
+              optionId: denyOption?.optionId ?? null,
+            },
+          };
         }
         return {};
       },
@@ -152,13 +197,21 @@ export class CursorAcpAdapter implements AgentAdapter {
 
     const reader = new JsonLineReader({
       onMessage: (msg) => {
-        rpc.handleLine(typeof msg === "string" ? msg : JSON.stringify(msg), reader);
+        rpc.handleLine(
+          typeof msg === "string" ? msg : JSON.stringify(msg),
+          reader,
+        );
       },
     });
 
     await rpc.request(
       "initialize",
-      { protocolVersion: ACP_PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } } },
+      {
+        protocolVersion: ACP_PROTOCOL_VERSION,
+        clientCapabilities: {
+          fs: { readTextFile: false, writeTextFile: false },
+        },
+      },
       INIT_TIMEOUT_MS,
     );
     rpc.notify("initialized");
@@ -166,17 +219,28 @@ export class CursorAcpAdapter implements AgentAdapter {
     // New session or continuation of an existing one.
     let activeSession = sessionId;
     if (!activeSession) {
-      const created = (await rpc.request("session/new", { cwd: ctx.cwd, mcpServers: [] }, INIT_TIMEOUT_MS)) as {
+      const created = (await rpc.request(
+        "session/new",
+        { cwd: ctx.cwd, mcpServers: [] },
+        INIT_TIMEOUT_MS,
+      )) as {
         sessionId?: string;
       } | null;
       if (!created?.sessionId) {
-        throw new BridgeError("ADAPTER_PROTOCOL_ERROR", "session/new returned no sessionId");
+        throw new BridgeError(
+          "ADAPTER_PROTOCOL_ERROR",
+          "session/new returned no sessionId",
+        );
       }
       activeSession = created.sessionId;
       ctx.onNativeId(activeSession);
     } else {
       try {
-        const loaded = (await rpc.request("session/load", { sessionId, cwd: ctx.cwd, mcpServers: [] }, INIT_TIMEOUT_MS)) as {
+        const loaded = (await rpc.request(
+          "session/load",
+          { sessionId, cwd: ctx.cwd, mcpServers: [] },
+          INIT_TIMEOUT_MS,
+        )) as {
           sessionId?: string;
         } | null;
         if (loaded?.sessionId) activeSession = loaded.sessionId;
@@ -188,7 +252,14 @@ export class CursorAcpAdapter implements AgentAdapter {
     let promptResult: { stopReason?: string } | null = null;
     try {
       promptResult = (await Promise.race([
-        rpc.request("session/prompt", { sessionId: activeSession, prompt: [{ type: "text", text: prompt }] }, 0),
+        rpc.request(
+          "session/prompt",
+          {
+            sessionId: activeSession,
+            prompt: [{ type: "text", text: prompt }],
+          },
+          0,
+        ),
         child.done.then(() => null),
       ])) as { stopReason?: string } | null;
     } finally {
@@ -209,7 +280,10 @@ export class CursorAcpAdapter implements AgentAdapter {
         adapter: this.name,
         status: "cancelled",
         summary: "Cursor ACP run cancelled.",
-        continuation: { supported: true, how: `cursor_reply with nativeId=${activeSession} (ACP session)` },
+        continuation: {
+          supported: true,
+          how: `cursor_reply with nativeId=${activeSession} (ACP session)`,
+        },
         startedAt,
         finishedAt,
         failure: { code: "JOB_CANCELLED", message: "aborted", retriable: true },
@@ -223,10 +297,17 @@ export class CursorAcpAdapter implements AgentAdapter {
         adapter: this.name,
         status: "failed",
         summary: `cursor-agent acp exited with code ${exit.code}.`,
-        continuation: { supported: true, how: `cursor_reply with nativeId=${activeSession} (ACP session)` },
+        continuation: {
+          supported: true,
+          how: `cursor_reply with nativeId=${activeSession} (ACP session)`,
+        },
         startedAt,
         finishedAt,
-        failure: { code: "CHILD_EXITED", message: `exit code ${exit.code}`, retriable: false },
+        failure: {
+          code: "CHILD_EXITED",
+          message: `exit code ${exit.code}`,
+          retriable: false,
+        },
       };
     }
 
@@ -235,15 +316,32 @@ export class CursorAcpAdapter implements AgentAdapter {
       nativeId: activeSession,
       adapter: this.name,
       status: stopReason === "refusal" ? "failed" : "completed",
-      summary: (finalText || "(cursor agent produced no message text)").slice(0, 10_000),
-      continuation: { supported: true, how: `cursor_reply with nativeId=${activeSession} (ACP session)` },
+      summary: (finalText || "(cursor agent produced no message text)").slice(
+        0,
+        10_000,
+      ),
+      continuation: {
+        supported: true,
+        how: `cursor_reply with nativeId=${activeSession} (ACP session)`,
+      },
       startedAt,
       finishedAt,
-      failure: stopReason === "refusal" ? { code: "ADAPTER_PROTOCOL_ERROR", message: "agent refused", retriable: false } : null,
+      failure:
+        stopReason === "refusal"
+          ? {
+              code: "ADAPTER_PROTOCOL_ERROR",
+              message: "agent refused",
+              retriable: false,
+            }
+          : null,
     };
   }
 
-  async reply(nativeId: string, message: string, ctx: AdapterRunContext): Promise<JobResult> {
+  async reply(
+    nativeId: string,
+    message: string,
+    ctx: AdapterRunContext,
+  ): Promise<JobResult> {
     // Follow-up: same flow with a session/load + short prompt.
     const result = await this.promptAndCollect({
       sessionId: nativeId,

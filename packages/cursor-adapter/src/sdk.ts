@@ -13,7 +13,12 @@
 
 import { BridgeError } from "@codex-cursor-bridge/bridge-core";
 import type { JobResult, StartRequest } from "@codex-cursor-bridge/bridge-core";
-import type { AdapterAvailability, AdapterCapabilities, AdapterRunContext, AgentAdapter } from "./types.js";
+import type {
+  AdapterAvailability,
+  AdapterCapabilities,
+  AdapterRunContext,
+  AgentAdapter,
+} from "./types.js";
 import { buildTaskPrompt } from "./prompt.js";
 
 /* Minimal structural typing over @cursor/sdk's exported surface.
@@ -40,14 +45,23 @@ export class CursorSdkAdapter implements AgentAdapter {
 
   async isAvailable(): Promise<AdapterAvailability> {
     if (!process.env.CURSOR_API_KEY) {
-      return { available: false, reason: "CURSOR_API_KEY is not set (required by @cursor/sdk)" };
+      return {
+        available: false,
+        reason: "CURSOR_API_KEY is not set (required by @cursor/sdk)",
+      };
     }
     const mod = await this.tryImport();
     if (!mod) {
-      return { available: false, reason: "@cursor/sdk is not installed (npm i @cursor/sdk)" };
+      return {
+        available: false,
+        reason: "@cursor/sdk is not installed (npm i @cursor/sdk)",
+      };
     }
     if (typeof mod.Agent !== "function") {
-      return { available: false, reason: "@cursor/sdk found but its Agent export is missing/changed" };
+      return {
+        available: false,
+        reason: "@cursor/sdk found but its Agent export is missing/changed",
+      };
     }
     return { available: true, version: "sdk" };
   }
@@ -68,8 +82,19 @@ export class CursorSdkAdapter implements AgentAdapter {
       continuation: true,
       structuredEvents: true,
       approvals: "none",
-      sandboxProfiles: ["read-only", "isolated-workspace-write", "current-workspace-write"],
-      modes: ["investigate", "review", "adversarial-review", "rescue", "plan", "implement"],
+      sandboxProfiles: [
+        "read-only",
+        "isolated-workspace-write",
+        "current-workspace-write",
+      ],
+      modes: [
+        "investigate",
+        "review",
+        "adversarial-review",
+        "rescue",
+        "plan",
+        "implement",
+      ],
     };
   }
 
@@ -77,7 +102,10 @@ export class CursorSdkAdapter implements AgentAdapter {
     const startedAt = new Date().toISOString();
     const mod = await this.tryImport();
     if (!mod?.Agent) {
-      throw new BridgeError("ADAPTER_UNSUPPORTED_CAPABILITY", "@cursor/sdk Agent export unavailable");
+      throw new BridgeError(
+        "ADAPTER_UNSUPPORTED_CAPABILITY",
+        "@cursor/sdk Agent export unavailable",
+      );
     }
     const AgentCtor = mod.Agent;
 
@@ -95,25 +123,45 @@ export class CursorSdkAdapter implements AgentAdapter {
     try {
       agent = new (AgentCtor as new (o: unknown) => SdkAgentLike)(agentOpts);
     } catch (err) {
-      throw new BridgeError("ADAPTER_UNSUPPORTED_CAPABILITY", `@cursor/sdk Agent constructor rejected our options: ${(err as Error).message}`, {
-        cause: err,
-      });
+      throw new BridgeError(
+        "ADAPTER_UNSUPPORTED_CAPABILITY",
+        `@cursor/sdk Agent constructor rejected our options: ${(err as Error).message}`,
+        {
+          cause: err,
+        },
+      );
     }
 
     const nativeId =
       typeof agent.id === "string"
         ? agent.id
-        : agent.id && typeof (agent.id as { toString(): string }).toString === "function"
+        : agent.id &&
+            typeof (agent.id as { toString(): string }).toString === "function"
           ? String(agent.id)
           : null;
     if (nativeId) ctx.onNativeId(nativeId);
-    else ctx.emit({ type: "cursor.warn", level: "warn", data: { message: "SDK agent did not expose an id" } });
+    else
+      ctx.emit({
+        type: "cursor.warn",
+        level: "warn",
+        data: { message: "SDK agent did not expose an id" },
+      });
 
     // Stream structured events when supported.
     if (typeof agent.on === "function") {
       try {
-        agent.on("status", (data) => ctx.emit({ type: "cursor.status", data: { status: safeStringify(data) } }));
-        agent.on("message", (data) => ctx.emit({ type: "cursor.message", data: { preview: safeStringify(data).slice(0, 2000) } }));
+        agent.on("status", (data) =>
+          ctx.emit({
+            type: "cursor.status",
+            data: { status: safeStringify(data) },
+          }),
+        );
+        agent.on("message", (data) =>
+          ctx.emit({
+            type: "cursor.message",
+            data: { preview: safeStringify(data).slice(0, 2000) },
+          }),
+        );
       } catch {
         // Event subscription differences are non-fatal.
       }
@@ -130,16 +178,22 @@ export class CursorSdkAdapter implements AgentAdapter {
       }
     };
     if (ctx.abortSignal.aborted) abortHandler();
-    else ctx.abortSignal.addEventListener("abort", abortHandler, { once: true });
+    else
+      ctx.abortSignal.addEventListener("abort", abortHandler, { once: true });
 
     let finalStatus: unknown;
     try {
       if (typeof agent.waitFor === "function") {
         finalStatus = await agent.waitFor();
-      } else if (typeof (agent as { done?: Promise<unknown> }).done === "object") {
+      } else if (
+        typeof (agent as { done?: Promise<unknown> }).done === "object"
+      ) {
         await (agent as { done: Promise<unknown> }).done;
       } else {
-        throw new BridgeError("ADAPTER_UNSUPPORTED_CAPABILITY", "SDK agent exposes neither waitFor() nor done");
+        throw new BridgeError(
+          "ADAPTER_UNSUPPORTED_CAPABILITY",
+          "SDK agent exposes neither waitFor() nor done",
+        );
       }
     } catch (err) {
       if (ctx.abortSignal.aborted) {
@@ -152,7 +206,11 @@ export class CursorSdkAdapter implements AgentAdapter {
           continuation: continuationFor(nativeId),
           startedAt,
           finishedAt: new Date().toISOString(),
-          failure: { code: "JOB_CANCELLED", message: "aborted", retriable: true },
+          failure: {
+            code: "JOB_CANCELLED",
+            message: "aborted",
+            retriable: true,
+          },
         };
       }
       throw err;
@@ -164,7 +222,8 @@ export class CursorSdkAdapter implements AgentAdapter {
       nativeId,
       adapter: this.name,
       status: "completed",
-      summary: text.slice(0, 10_000) || "(cursor agent finished without final text)",
+      summary:
+        text.slice(0, 10_000) || "(cursor agent finished without final text)",
       continuation: continuationFor(nativeId),
       startedAt,
       finishedAt: new Date().toISOString(),
@@ -172,10 +231,17 @@ export class CursorSdkAdapter implements AgentAdapter {
     };
   }
 
-  async reply(nativeId: string, message: string, ctx: AdapterRunContext): Promise<JobResult> {
+  async reply(
+    nativeId: string,
+    message: string,
+    ctx: AdapterRunContext,
+  ): Promise<JobResult> {
     const mod = await this.tryImport();
     if (!mod?.Agent) {
-      throw new BridgeError("ADAPTER_UNSUPPORTED_CAPABILITY", "@cursor/sdk Agent export unavailable");
+      throw new BridgeError(
+        "ADAPTER_UNSUPPORTED_CAPABILITY",
+        "@cursor/sdk Agent export unavailable",
+      );
     }
     const startedAt = new Date().toISOString();
     // Construct a handle to the existing agent by id when the SDK supports it.
@@ -199,7 +265,9 @@ export class CursorSdkAdapter implements AgentAdapter {
       nativeId,
       adapter: this.name,
       status: "completed",
-      summary: extractFinalText(agent, agent.status).slice(0, 10_000) || "(follow-up completed)",
+      summary:
+        extractFinalText(agent, agent.status).slice(0, 10_000) ||
+        "(follow-up completed)",
       continuation: continuationFor(nativeId),
       startedAt,
       finishedAt: new Date().toISOString(),
@@ -224,14 +292,21 @@ export class CursorSdkAdapter implements AgentAdapter {
   }
 }
 
-function continuationFor(nativeId: string | null): { supported: boolean; how: string } {
+function continuationFor(nativeId: string | null): {
+  supported: boolean;
+  how: string;
+} {
   return nativeId
-    ? { supported: true, how: `cursor_reply with nativeId=${nativeId} (SDK follow-up)` }
+    ? {
+        supported: true,
+        how: `cursor_reply with nativeId=${nativeId} (SDK follow-up)`,
+      }
     : { supported: false, how: "no agent id was returned by the SDK" };
 }
 
 function extractFinalText(agent: SdkAgentLike, finalStatus: unknown): string {
-  if (typeof agent.text === "string" && agent.text.length > 0) return agent.text;
+  if (typeof agent.text === "string" && agent.text.length > 0)
+    return agent.text;
   if (Array.isArray(agent.messages)) {
     const last = [...(agent.messages as unknown[])].reverse().find((m) => {
       const rec = m as { role?: string; text?: string; content?: unknown };
@@ -244,7 +319,7 @@ function extractFinalText(agent: SdkAgentLike, finalStatus: unknown): string {
 
 function safeStringify(v: unknown): string {
   try {
-    return typeof v === "string" ? v : JSON.stringify(v) ?? String(v);
+    return typeof v === "string" ? v : (JSON.stringify(v) ?? String(v));
   } catch {
     return String(v);
   }

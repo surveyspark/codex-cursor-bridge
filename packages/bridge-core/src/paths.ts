@@ -51,14 +51,23 @@ export function assertInsideRepo(
 export function assertRepoRelative(p: string): string {
   if (p === ".") return ".";
   if (path.isAbsolute(p) || /^[A-Za-z]:/.test(p)) {
-    throw new BridgeError("PATH_OUTSIDE_REPOSITORY", `path "${p}" must be repository-relative`);
+    throw new BridgeError(
+      "PATH_OUTSIDE_REPOSITORY",
+      `path "${p}" must be repository-relative`,
+    );
   }
   const norm = path.normalize(p);
   if (norm === ".." || norm.startsWith(`..${path.sep}`)) {
-    throw new BridgeError("PATH_ESCAPE", `path "${p}" must not traverse upward`);
+    throw new BridgeError(
+      "PATH_ESCAPE",
+      `path "${p}" must not traverse upward`,
+    );
   }
   if (norm.split(path.sep).includes("..")) {
-    throw new BridgeError("PATH_ESCAPE", `path "${p}" must not contain ".." segments`);
+    throw new BridgeError(
+      "PATH_ESCAPE",
+      `path "${p}" must not contain ".." segments`,
+    );
   }
   return norm;
 }
@@ -67,12 +76,18 @@ export function assertRepoRelative(p: string): string {
  * Detect whether any component of the path (that exists) is a symlink that
  * escapes `repoRoot`. Returns the canonical path when safe.
  */
-export function assertNoSymlinkEscape(repoRoot: string, target: string): string {
+export function assertNoSymlinkEscape(
+  repoRoot: string,
+  target: string,
+): string {
   const root = canonicalize(repoRoot);
   const abs = path.isAbsolute(target) ? target : path.resolve(root, target);
   const rel = path.relative(root, abs);
   if (rel.startsWith("..") || path.isAbsolute(rel)) {
-    throw new BridgeError("PATH_OUTSIDE_REPOSITORY", `target "${target}" is outside the repository`);
+    throw new BridgeError(
+      "PATH_OUTSIDE_REPOSITORY",
+      `target "${target}" is outside the repository`,
+    );
   }
   // Walk each component and realpath-check.
   const parts = rel === "" ? [] : rel.split(path.sep);
@@ -100,8 +115,14 @@ export function assertNoSymlinkEscape(repoRoot: string, target: string): string 
 }
 
 /** Build a unique, collision-resistant worktree directory name. */
-export function worktreeDirName(repoRoot: string, jobId: string, baseRef: string): string {
-  const repoName = path.basename(canonicalize(repoRoot)).replace(/[^A-Za-z0-9._-]/g, "-");
+export function worktreeDirName(
+  repoRoot: string,
+  jobId: string,
+  baseRef: string,
+): string {
+  const repoName = path
+    .basename(canonicalize(repoRoot))
+    .replace(/[^A-Za-z0-9._-]/g, "-");
   const ref = baseRef.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 40) || "base";
   const short = jobId.replace(/^job_/, "").slice(0, 8);
   return `${repoName}-${ref}-${short}`;

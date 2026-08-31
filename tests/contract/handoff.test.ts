@@ -18,16 +18,30 @@ afterAll(() => {
 });
 
 function managerWith(repoRoot: string, scratch: string) {
-  const fakeCodex = materializeFake(scratch, "fake-codex.cjs", fakeCodexAppServer({}));
+  const fakeCodex = materializeFake(
+    scratch,
+    "fake-codex.cjs",
+    fakeCodexAppServer({}),
+  );
   const fakeAcp = materializeFake(scratch, "fake-acp.cjs", fakeCursorAcp({}));
   return new JobManager({
     repoRoot,
     config: { worktreeRoot: path.join(scratch, "worktrees") },
     selectAdapter: async (_req, record) => {
       if (record.targetHost === "codex") {
-        return { adapter: new CodexAppServerAdapter({ argvOverride: [process.execPath, fakeCodex] }), reason: "fake" };
+        return {
+          adapter: new CodexAppServerAdapter({
+            argvOverride: [process.execPath, fakeCodex],
+          }),
+          reason: "fake",
+        };
       }
-      return { adapter: new CursorAcpAdapter({ argvOverride: [process.execPath, fakeAcp] }), reason: "fake" };
+      return {
+        adapter: new CursorAcpAdapter({
+          argvOverride: [process.execPath, fakeAcp],
+        }),
+        reason: "fake",
+      };
     },
   });
 }
@@ -37,7 +51,10 @@ const PLAN = {
   task: "Add retry to fetchUser",
   goal: "reduce transient failures",
   observedRepositoryFacts: [
-    { fact: "fetchUser lives in src/api/user.ts", evidence: ["src/api/user.ts"] },
+    {
+      fact: "fetchUser lives in src/api/user.ts",
+      evidence: ["src/api/user.ts"],
+    },
   ],
   implementationSteps: [
     {
@@ -69,7 +86,12 @@ describe("contract: plan-to-execution handoff", () => {
       selectAdapter: async (request) => {
         receivedTask = request.task;
         gotConstraints = request.constraints;
-        return { adapter: new CursorAcpAdapter({ argvOverride: [process.execPath, fakeAcp] }), reason: "fake" };
+        return {
+          adapter: new CursorAcpAdapter({
+            argvOverride: [process.execPath, fakeAcp],
+          }),
+          reason: "fake",
+        };
       },
     });
     const enq = await manager.enqueue(
@@ -109,7 +131,13 @@ describe("contract: plan-to-execution handoff", () => {
     cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
     const manager = managerWith(repo, scratch);
     await manager.enqueue(
-      { task: "a", cwd: repo, mode: "investigate", permissionProfile: "read-only", background: false },
+      {
+        task: "a",
+        cwd: repo,
+        mode: "investigate",
+        permissionProfile: "read-only",
+        background: false,
+      },
       { host: "cursor", tool: "codex_start" },
     );
     const jobs = manager.list();
@@ -124,7 +152,13 @@ describe("contract: plan-to-execution handoff", () => {
     cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
     const manager = managerWith(repo, scratch);
     const enq = await manager.enqueue(
-      { task: "a", cwd: repo, mode: "investigate", permissionProfile: "read-only", background: false },
+      {
+        task: "a",
+        cwd: repo,
+        mode: "investigate",
+        permissionProfile: "read-only",
+        background: false,
+      },
       { host: "cursor", tool: "codex_start" },
     );
     // No run: job is queued with no native id.

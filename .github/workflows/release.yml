@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: sudo apt-get update -y && sudo apt-get install -y zip
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lint
+      - run: npm run validate:manifests
+      - name: Test suite
+        run: npm test
+      - name: Package
+        run: npm run package
+      - name: Verify checksums
+        run: cd release && shasum -a 256 -c SHA256SUMS
+      - name: Extract release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk "/## \\[$VERSION\\]/{flag=1;next}/## \\[/{if(flag)exit}flag" CHANGELOG.md > RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "See CHANGELOG.md for details." > RELEASE_NOTES.md
+          fi
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          files: |
+            release/*.zip
+            release/SHA256SUMS
+            release/sbom-*.json
+          fail_on_unmatched_files: true

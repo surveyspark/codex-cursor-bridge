@@ -49,7 +49,19 @@ export function buildChildEnv(
 ): Record<string, string> {
   const env: Record<string, string> = {};
   // Minimal stable defaults every CLI needs.
-  const defaults = ["PATH", "PATHEXT", "HOME", "USERPROFILE", "APPDATA", "TMP", "TEMP", "SYSTEMROOT", "COMSPEC", "LANG", "TZ"];
+  const defaults = [
+    "PATH",
+    "PATHEXT",
+    "HOME",
+    "USERPROFILE",
+    "APPDATA",
+    "TMP",
+    "TEMP",
+    "SYSTEMROOT",
+    "COMSPEC",
+    "LANG",
+    "TZ",
+  ];
   for (const name of defaults) {
     const v = process.env[name];
     if (v !== undefined) env[name] = v;
@@ -85,26 +97,40 @@ export function spawnProcess(opts: SpawnOptions): SpawnHandle {
     killed = true;
     if (isWindows) {
       // taskkill /T kills the full tree; /F forces.
-      const tk = spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { shell: false, windowsHide: true });
+      const tk = spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+        shell: false,
+        windowsHide: true,
+      });
       await new Promise<void>((resolve) => tk.once("close", () => resolve()));
     } else {
       try {
         // Negative pid targets the whole process group.
         process.kill(-child.pid, "SIGTERM");
       } catch {
-        try { child.kill("SIGTERM"); } catch { /* already gone */ }
+        try {
+          child.kill("SIGTERM");
+        } catch {
+          /* already gone */
+        }
       }
       const grace = opts.killGraceMs ?? 3000;
       await new Promise<void>((resolve) => {
         const t = setTimeout(resolve, grace);
-        child.once("exit", () => { clearTimeout(t); resolve(); });
+        child.once("exit", () => {
+          clearTimeout(t);
+          resolve();
+        });
       });
       try {
         if (child.pid !== undefined && child.exitCode === null) {
           process.kill(-child.pid, "SIGKILL");
         }
       } catch {
-        try { child.kill("SIGKILL"); } catch { /* already gone */ }
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          /* already gone */
+        }
       }
     }
   };
@@ -170,7 +196,13 @@ export function spawnProcess(opts: SpawnOptions): SpawnHandle {
 
   const done = new Promise<SpawnOutcome>((resolve, reject) => {
     child.once("error", (err) => {
-      reject(new BridgeError("ADAPTER_SPAWN_FAILED", `failed to spawn ${opts.argv[0]}: ${err.message}`, { cause: err }));
+      reject(
+        new BridgeError(
+          "ADAPTER_SPAWN_FAILED",
+          `failed to spawn ${opts.argv[0]}: ${err.message}`,
+          { cause: err },
+        ),
+      );
     });
     child.once("exit", (code, signal) => {
       resolve({ code, signal, timedOut });

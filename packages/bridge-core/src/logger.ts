@@ -8,7 +8,12 @@ import { redactString } from "./redact.js";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
-const LEVEL_ORDER: Record<LogLevel, number> = { debug: 10, info: 20, warn: 30, error: 40 };
+const LEVEL_ORDER: Record<LogLevel, number> = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40,
+};
 
 export interface Logger {
   debug(msg: string, data?: unknown): void;
@@ -31,8 +36,7 @@ export interface CreateLoggerOptions {
 export function createLogger(opts: CreateLoggerOptions = {}): Logger {
   const level = opts.level ?? "info";
   const maxBytes = opts.maxFileBytes ?? 5_000_000;
-  let filePath = opts.filePath ?? null;
-  let wrote = 0;
+  const filePath = opts.filePath ?? null;
 
   const ensureDir = (): void => {
     if (!filePath) return;
@@ -43,13 +47,11 @@ export function createLogger(opts: CreateLoggerOptions = {}): Logger {
     if (!filePath) return;
     try {
       const st = fs.statSync(filePath);
-      wrote = st.size;
       if (st.size >= maxBytes) {
         fs.renameSync(filePath, `${filePath}.1`);
-        wrote = 0;
       }
     } catch {
-      wrote = 0;
+      // rotation is best effort
     }
   };
 
@@ -59,7 +61,8 @@ export function createLogger(opts: CreateLoggerOptions = {}): Logger {
     const redactedData =
       data === undefined
         ? ""
-        : " " + redactString(
+        : " " +
+          redactString(
             typeof data === "string" ? data : JSON.stringify(redactValue(data)),
           );
     const line = `${ts} ${lvl.toUpperCase()} ${redactString(msg)}${redactedData}\n`;
@@ -71,7 +74,6 @@ export function createLogger(opts: CreateLoggerOptions = {}): Logger {
       ensureDir();
       rotateIfNeeded();
       fs.appendFileSync(filePath, line);
-      wrote += line.length;
     } catch {
       // Logging must never take the bridge down.
     }
@@ -95,7 +97,9 @@ function redactValue(value: unknown, depth = 0): unknown {
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (/^(authorization|cookie|password|secret|token|apiKey|api_key)$/i.test(k)) {
+      if (
+        /^(authorization|cookie|password|secret|token|apiKey|api_key)$/i.test(k)
+      ) {
         out[k] = "***REDACTED***";
       } else {
         out[k] = redactValue(v, depth + 1);

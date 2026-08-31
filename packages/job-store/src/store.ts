@@ -15,7 +15,8 @@
  */
 
 import fs from "node:fs";
-import path from "node:path";import {
+import path from "node:path";
+import {
   BridgeError,
   TERMINAL_JOB_STATUSES,
   isPidAlive,
@@ -61,7 +62,10 @@ export class JobStore {
 
   /** Create and persist a new job record. */
   create(
-    init: Omit<JobRecord, "schemaVersion" | "createdAt" | "updatedAt" | "status" | "events"> &
+    init: Omit<
+      JobRecord,
+      "schemaVersion" | "createdAt" | "updatedAt" | "status" | "events"
+    > &
       Partial<Pick<JobRecord, "status">>,
   ): JobRecord {
     if (!/^job_[0-9a-f]{32}$/.test(init.jobId)) {
@@ -77,7 +81,10 @@ export class JobStore {
     } as JobRecord;
     const dir = this.jobDir(record.jobId);
     if (fs.existsSync(this.jobFile(record.jobId))) {
-      throw new BridgeError("BRIDGE_USAGE", `job ${record.jobId} already exists`);
+      throw new BridgeError(
+        "BRIDGE_USAGE",
+        `job ${record.jobId} already exists`,
+      );
     }
     this.ensureDir(dir);
     this.writeAtomic(record);
@@ -86,13 +93,20 @@ export class JobStore {
 
   private writeAtomic(record: JobRecord): void {
     const file = this.jobFile(record.jobId);
-    const tmp = path.join(this.jobDir(record.jobId), `.job.json.tmp-${process.pid}-${Date.now()}`);
+    const tmp = path.join(
+      this.jobDir(record.jobId),
+      `.job.json.tmp-${process.pid}-${Date.now()}`,
+    );
     const json = JSON.stringify(redactDeep(record), null, 2);
     fs.writeFileSync(tmp, json, { mode: 0o600 });
     try {
       fs.renameSync(tmp, file);
     } catch (err) {
-      try { fs.rmSync(tmp, { force: true }); } catch { /* best effort */ }
+      try {
+        fs.rmSync(tmp, { force: true });
+      } catch {
+        /* best effort */
+      }
       throw err;
     }
   }
@@ -112,17 +126,28 @@ export class JobStore {
       if (e.code === "ENOENT") {
         throw new BridgeError("JOB_NOT_FOUND", `job ${jobId} not found`);
       }
-      throw new BridgeError("JOB_STATE_CORRUPT", `failed to read job ${jobId}: ${e.message}`, { cause: err });
+      throw new BridgeError(
+        "JOB_STATE_CORRUPT",
+        `failed to read job ${jobId}: ${e.message}`,
+        { cause: err },
+      );
     }
     try {
       const parsed = JSON.parse(text) as JobRecord;
       if (parsed.jobId !== jobId) {
-        throw new BridgeError("JOB_STATE_CORRUPT", `job record id mismatch in ${file}`);
+        throw new BridgeError(
+          "JOB_STATE_CORRUPT",
+          `job record id mismatch in ${file}`,
+        );
       }
       return parsed;
     } catch (err) {
       if (err instanceof BridgeError) throw err;
-      throw new BridgeError("JOB_STATE_CORRUPT", `job record for ${jobId} is not valid JSON`, { cause: err });
+      throw new BridgeError(
+        "JOB_STATE_CORRUPT",
+        `job record for ${jobId} is not valid JSON`,
+        { cause: err },
+      );
     }
   }
 
@@ -139,7 +164,9 @@ export class JobStore {
   list(): JobRecord[] {
     this.ensureDir(this.opts.jobsDir);
     const out: JobRecord[] = [];
-    for (const entry of fs.readdirSync(this.opts.jobsDir, { withFileTypes: true })) {
+    for (const entry of fs.readdirSync(this.opts.jobsDir, {
+      withFileTypes: true,
+    })) {
       if (!entry.isDirectory()) continue;
       if (!/^job_[0-9a-f]{32}$/.test(entry.name)) continue;
       try {
@@ -177,7 +204,10 @@ export class JobStore {
   }
 
   /** Append an event with truncation limits. */
-  appendEvent(jobId: string, event: Omit<JobEvent, "ts"> & { ts?: string }): void {
+  appendEvent(
+    jobId: string,
+    event: Omit<JobEvent, "ts"> & { ts?: string },
+  ): void {
     this.update(jobId, (record) => {
       const e: JobEvent = { ts: event.ts ?? nowIso(), type: event.type };
       if (event.level !== undefined) e.level = event.level;
@@ -198,7 +228,11 @@ export class JobStore {
   }
 
   /** Set job status with transition validation. */
-  setStatus(jobId: string, next: JobStatus, opts: { exitCode?: number | null; finished?: boolean } = {}): void {
+  setStatus(
+    jobId: string,
+    next: JobStatus,
+    opts: { exitCode?: number | null; finished?: boolean } = {},
+  ): void {
     this.update(jobId, (record) => {
       assertTransition(record.status, next);
       record.status = next;
@@ -234,7 +268,10 @@ export class JobStore {
         // Stale lock takeover.
         try {
           const ownerFile = path.join(lockDir, "owner");
-          const owner = JSON.parse(fs.readFileSync(ownerFile, "utf8")) as { pid: number; at: string };
+          const owner = JSON.parse(fs.readFileSync(ownerFile, "utf8")) as {
+            pid: number;
+            at: string;
+          };
           const ageMs = Date.now() - Date.parse(owner.at);
           if (!isPidAlive(owner.pid) || ageMs > staleMs) {
             fs.rmSync(lockDir, { recursive: true, force: true });
@@ -242,11 +279,18 @@ export class JobStore {
           }
         } catch {
           // No owner info or unreadable: treat as stale.
-          try { fs.rmSync(lockDir, { recursive: true, force: true }); } catch { /* ignore */ }
+          try {
+            fs.rmSync(lockDir, { recursive: true, force: true });
+          } catch {
+            /* ignore */
+          }
           continue;
         }
         if (Date.now() > deadline) {
-          throw new BridgeError("JOB_LOCKED", `job ${jobId} is locked by another bridge process`);
+          throw new BridgeError(
+            "JOB_LOCKED",
+            `job ${jobId} is locked by another bridge process`,
+          );
         }
         const wait = 50 + Math.floor(Math.random() * 50);
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait);
@@ -273,9 +317,19 @@ export class JobStore {
             nativeId: r.nativeId ?? null,
             adapter: r.adapter,
             status: "failed",
-            summary: "Bridge worker exited without recording a final status (crash or system restart). The underlying agent may still have been running; inspect the repository state before retrying.",
-            continuation: { supported: r.nativeId != null, how: r.nativeId ? `resume via native id ${r.nativeId}` : "not available" },
-            failure: { code: "JOB_STATE_CORRUPT", message: "worker process lost", retriable: true },
+            summary:
+              "Bridge worker exited without recording a final status (crash or system restart). The underlying agent may still have been running; inspect the repository state before retrying.",
+            continuation: {
+              supported: r.nativeId != null,
+              how: r.nativeId
+                ? `resume via native id ${r.nativeId}`
+                : "not available",
+            },
+            failure: {
+              code: "JOB_STATE_CORRUPT",
+              message: "worker process lost",
+              retriable: true,
+            },
             startedAt: r.startedAt ?? null,
             finishedAt: nowIso(),
           };
@@ -287,23 +341,36 @@ export class JobStore {
   }
 
   /** Delete terminal jobs past retention; returns removed job ids. */
-  clean(opts: { completedRetentionDays: number; failedRetentionDays: number; dryRun?: boolean }): string[] {
+  clean(opts: {
+    completedRetentionDays: number;
+    failedRetentionDays: number;
+    dryRun?: boolean;
+  }): string[] {
     const removed: string[] = [];
     const now = Date.now();
     for (const record of this.list()) {
       if (!TERMINAL_JOB_STATUSES.has(record.status)) continue;
       const days =
-        record.status === "completed" ? opts.completedRetentionDays : opts.failedRetentionDays;
+        record.status === "completed"
+          ? opts.completedRetentionDays
+          : opts.failedRetentionDays;
       const finished = Date.parse(record.finishedAt ?? record.updatedAt);
       if (now - finished > days * 86_400_000) {
         removed.push(record.jobId);
         if (!opts.dryRun) {
           try {
-            fs.rmSync(this.jobDir(record.jobId), { recursive: true, force: true });
+            fs.rmSync(this.jobDir(record.jobId), {
+              recursive: true,
+              force: true,
+            });
           } catch (err) {
             const e = err as NodeJS.ErrnoException;
             if (e.code !== "ENOENT") {
-              throw new BridgeError("BRIDGE_INTERNAL", `failed to remove ${record.jobId}: ${e.message}`, { cause: err });
+              throw new BridgeError(
+                "BRIDGE_INTERNAL",
+                `failed to remove ${record.jobId}: ${e.message}`,
+                { cause: err },
+              );
             }
           }
         }
@@ -353,6 +420,7 @@ export function newJobId(): string {
   const bytes = new Uint8Array(16);
   globalThis.crypto.getRandomValues(bytes);
   let hex = "";
-  for (let i = 0; i < bytes.length; i++) hex += bytes[i]!.toString(16).padStart(2, "0");
+  for (let i = 0; i < bytes.length; i++)
+    hex += bytes[i]!.toString(16).padStart(2, "0");
   return `job_${hex}`;
 }

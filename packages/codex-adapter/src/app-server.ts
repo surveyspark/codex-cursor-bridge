@@ -92,7 +92,9 @@ export class CodexAppServerAdapter implements AgentAdapter {
 
   async codexVersion(): Promise<string | null> {
     try {
-      const { stdout } = await execFileAsync(this.binary(), ["--version"], { timeout: 10_000 });
+      const { stdout } = await execFileAsync(this.binary(), ["--version"], {
+        timeout: 10_000,
+      });
       return stdout.trim().split(/\s+/).pop() ?? stdout.trim();
     } catch {
       return null;
@@ -105,7 +107,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
   }
 
   async isAvailable(): Promise<AdapterAvailability> {
-    if (this.opts.argvOverride) return { available: true, version: "test-fake" };
+    if (this.opts.argvOverride)
+      return { available: true, version: "test-fake" };
     const version = await this.codexVersion();
     if (!version) {
       return { available: false, reason: "codex CLI not found on PATH" };
@@ -121,8 +124,19 @@ export class CodexAppServerAdapter implements AgentAdapter {
       continuation: true,
       structuredEvents: true,
       approvals: "relayed",
-      sandboxProfiles: ["read-only", "isolated-workspace-write", "current-workspace-write"],
-      modes: ["investigate", "review", "adversarial-review", "rescue", "plan", "implement"],
+      sandboxProfiles: [
+        "read-only",
+        "isolated-workspace-write",
+        "current-workspace-write",
+      ],
+      modes: [
+        "investigate",
+        "review",
+        "adversarial-review",
+        "rescue",
+        "plan",
+        "implement",
+      ],
     };
   }
 
@@ -151,15 +165,28 @@ export class CodexAppServerAdapter implements AgentAdapter {
       );
       const init = (await conn.rpc.request(
         "initialize",
-        { clientInfo: { name: "codex-cursor-bridge", title: "codex-cursor-bridge", version: "0.1.0" } },
+        {
+          clientInfo: {
+            name: "codex-cursor-bridge",
+            title: "codex-cursor-bridge",
+            version: "0.1.0",
+          },
+        },
         INIT_TIMEOUT_MS,
       )) as { userAgent?: string } | null;
       conn.shutdown();
-      return { ok: true, detail: "initialize succeeded", ...(init?.userAgent ? { userAgent: init.userAgent } : {}) };
+      return {
+        ok: true,
+        detail: "initialize succeeded",
+        ...(init?.userAgent ? { userAgent: init.userAgent } : {}),
+      };
     } catch (err) {
       holder.p?.killTree().catch(() => {});
       const be = err as { message?: string; code?: string };
-      return { ok: false, detail: `${be.code ?? "ADAPTER_INIT_FAILED"}: ${be.message ?? String(err)}` };
+      return {
+        ok: false,
+        detail: `${be.code ?? "ADAPTER_INIT_FAILED"}: ${be.message ?? String(err)}`,
+      };
     }
   }
 
@@ -178,20 +205,33 @@ export class CodexAppServerAdapter implements AgentAdapter {
     turnErrors: () => Array<Record<string, unknown>>;
   }> {
     if (ctx.abortSignal.aborted) {
-      throw new BridgeError("JOB_CANCELLED", "cancelled before the agent process started");
+      throw new BridgeError(
+        "JOB_CANCELLED",
+        "cancelled before the agent process started",
+      );
     }
     const child = spawnProcess({
       cwd: ctx.cwd,
       argv: this.argv(),
       env: buildChildEnv(
         [
-          ...(this.opts.forwardEnv ?? ["OPENAI_API_KEY", "CODEX_HOME", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"]),
+          ...(this.opts.forwardEnv ?? [
+            "OPENAI_API_KEY",
+            "CODEX_HOME",
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "NO_PROXY",
+          ]),
         ],
         this.opts.extraEnv,
       ),
       onStdoutLine: (line) => reader.push(line),
       onStderrLine: (line) => {
-        ctx.emit({ type: "codex.stderr", level: "debug", data: { line: redactString(line) } });
+        ctx.emit({
+          type: "codex.stderr",
+          level: "debug",
+          data: { line: redactString(line) },
+        });
       },
       abortSignal: ctx.abortSignal,
     });
@@ -219,7 +259,10 @@ export class CodexAppServerAdapter implements AgentAdapter {
             if (thread && typeof thread.id === "string") {
               threads.set(thread.id, {
                 id: thread.id,
-                sessionId: typeof thread.sessionId === "string" ? thread.sessionId : null,
+                sessionId:
+                  typeof thread.sessionId === "string"
+                    ? thread.sessionId
+                    : null,
                 turnId: null,
               });
               ctx.onNativeId(thread.id);
@@ -237,7 +280,10 @@ export class CodexAppServerAdapter implements AgentAdapter {
           case "item/started": {
             const item = params.item as Record<string, unknown> | undefined;
             if (item) {
-              ctx.emit({ type: "item.started", data: { type: item.type, id: item.id } });
+              ctx.emit({
+                type: "item.started",
+                data: { type: item.type, id: item.id },
+              });
             }
             break;
           }
@@ -250,7 +296,10 @@ export class CodexAppServerAdapter implements AgentAdapter {
             const item = params.item as Record<string, unknown> | undefined;
             if (item && typeof item.type === "string") {
               items.push({ item, kind: item.type });
-              if (item.type === "agentMessage" && typeof item.text === "string") {
+              if (
+                item.type === "agentMessage" &&
+                typeof item.text === "string"
+              ) {
                 lastAgentMessage = item.text;
               }
               ctx.emit({ type: "item.completed", data: summarizeItem(item) });
@@ -262,7 +311,10 @@ export class CodexAppServerAdapter implements AgentAdapter {
             break;
           }
           case "turn/completed": {
-            ctx.emit({ type: "turn.completed", data: { threadId: params.threadId } });
+            ctx.emit({
+              type: "turn.completed",
+              data: { threadId: params.threadId },
+            });
             break;
           }
           case "error": {
@@ -271,13 +323,25 @@ export class CodexAppServerAdapter implements AgentAdapter {
             break;
           }
           case "turn/diff/updated": {
-            ctx.emit({ type: "turn.diff.updated", data: { unifiedDiff: typeof params.unifiedDiff === "string" ? params.unifiedDiff : undefined } });
+            ctx.emit({
+              type: "turn.diff.updated",
+              data: {
+                unifiedDiff:
+                  typeof params.unifiedDiff === "string"
+                    ? params.unifiedDiff
+                    : undefined,
+              },
+            });
             break;
           }
           default:
             // Unknown notifications are ignored for forward compatibility.
             if (ctx.debugLogging) {
-              ctx.emit({ type: "codex.unknown-notification", level: "debug", data: { method: msg.method } });
+              ctx.emit({
+                type: "codex.unknown-notification",
+                level: "debug",
+                data: { method: msg.method },
+              });
             }
         }
       },
@@ -293,13 +357,18 @@ export class CodexAppServerAdapter implements AgentAdapter {
             : kind === "applyPatchApproval"
               ? "apply patch"
               : `codex server request: ${kind}`;
-        ctx.emit({ type: "approval.request", level: "warn", data: { kind, summary: redactString(summary) } });
+        ctx.emit({
+          type: "approval.request",
+          level: "warn",
+          data: { kind, summary: redactString(summary) },
+        });
         ctx.approval({
           ts: new Date().toISOString(),
           kind,
           summary: redactString(summary),
           decision: "auto-denied",
-          reason: "bridge runs Codex with approvalPolicy=never and narrow sandbox; escalation requests are denied",
+          reason:
+            "bridge runs Codex with approvalPolicy=never and narrow sandbox; escalation requests are denied",
         });
         // Response shapes: { decision: "approved" | "denied" } historically;
         // current schema uses reviewDecision "approved"|"denied" etc. Send the
@@ -314,10 +383,17 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const rpcRef = rpc;
     const reader = new JsonLineReader({
       onMessage: (msg) => {
-        rpcRef.handleLine(typeof msg === "string" ? msg : JSON.stringify(msg), reader);
+        rpcRef.handleLine(
+          typeof msg === "string" ? msg : JSON.stringify(msg),
+          reader,
+        );
       },
       onMalformed: (err) => {
-        ctx.emit({ type: "codex.malformed-json", level: "warn", data: { error: String(err) } });
+        ctx.emit({
+          type: "codex.malformed-json",
+          level: "warn",
+          data: { error: String(err) },
+        });
       },
       onOversized: () => {
         ctx.emit({ type: "codex.oversized-message", level: "warn" });
@@ -330,15 +406,28 @@ export class CodexAppServerAdapter implements AgentAdapter {
         // Do NOT close the rpc here: a pending request's rejection would win
         // the exit race with the wrong error. shutdown() closes it.
         if (outcome.code !== 0 && !outcome.timedOut) {
-          ctx.emit({ type: "codex.exit", level: "warn", data: { code: outcome.code, signal: outcome.signal } });
+          ctx.emit({
+            type: "codex.exit",
+            level: "warn",
+            data: { code: outcome.code, signal: outcome.signal },
+          });
         }
       })
       .catch(() => {});
 
     // Initialize handshake (racing an early cancel).
     const abortInit = new Promise<never>((_, reject) => {
-      if (ctx.abortSignal.aborted) reject(new BridgeError("JOB_CANCELLED", "cancelled during initialize"));
-      else ctx.abortSignal.addEventListener("abort", () => reject(new BridgeError("JOB_CANCELLED", "cancelled during initialize")), { once: true });
+      if (ctx.abortSignal.aborted)
+        reject(new BridgeError("JOB_CANCELLED", "cancelled during initialize"));
+      else
+        ctx.abortSignal.addEventListener(
+          "abort",
+          () =>
+            reject(
+              new BridgeError("JOB_CANCELLED", "cancelled during initialize"),
+            ),
+          { once: true },
+        );
     });
     const initTimeout = setTimeout(() => {
       child.killTree().catch(() => {});
@@ -347,7 +436,13 @@ export class CodexAppServerAdapter implements AgentAdapter {
       await Promise.race([
         rpc.request(
           "initialize",
-          { clientInfo: { name: "codex-cursor-bridge", title: "codex-cursor-bridge", version: "0.1.0" } },
+          {
+            clientInfo: {
+              name: "codex-cursor-bridge",
+              title: "codex-cursor-bridge",
+              version: "0.1.0",
+            },
+          },
           INIT_TIMEOUT_MS,
         ),
         abortInit,
@@ -385,10 +480,18 @@ export class CodexAppServerAdapter implements AgentAdapter {
         continuation: { supported: false, how: "job never started" },
         startedAt,
         finishedAt: new Date().toISOString(),
-        failure: { code: "JOB_CANCELLED", message: "cancelled during startup", retriable: false },
+        failure: {
+          code: "JOB_CANCELLED",
+          message: "cancelled during startup",
+          retriable: false,
+        },
       };
     }
-    const sandbox = mapProfileToSandbox(request.permissionProfile, ctx.cwd, ctx.networkPolicy);
+    const sandbox = mapProfileToSandbox(
+      request.permissionProfile,
+      ctx.cwd,
+      ctx.networkPolicy,
+    );
     const conn = await this.connect(ctx);
     const warnings: string[] = [];
 
@@ -401,12 +504,19 @@ export class CodexAppServerAdapter implements AgentAdapter {
       };
       if (request.model) startParams.model = request.model;
 
-      const startRes = (await conn.rpc.request("thread/start", startParams, TURN_START_TIMEOUT_MS)) as {
+      const startRes = (await conn.rpc.request(
+        "thread/start",
+        startParams,
+        TURN_START_TIMEOUT_MS,
+      )) as {
         thread?: { id?: string; sessionId?: string };
       };
       const threadId = startRes?.thread?.id;
       if (!threadId) {
-        throw new BridgeError("ADAPTER_PROTOCOL_ERROR", "thread/start returned no thread.id");
+        throw new BridgeError(
+          "ADAPTER_PROTOCOL_ERROR",
+          "thread/start returned no thread.id",
+        );
       }
       ctx.onNativeId(threadId);
 
@@ -422,16 +532,29 @@ export class CodexAppServerAdapter implements AgentAdapter {
 
       // Race: turn completion vs abort vs process exit.
       const abortPromise = new Promise<never>((_, reject) => {
-        if (ctx.abortSignal.aborted) reject(new BridgeError("JOB_CANCELLED", "job aborted"));
-        else ctx.abortSignal.addEventListener("abort", () => reject(new BridgeError("JOB_CANCELLED", "job aborted")), { once: true });
+        if (ctx.abortSignal.aborted)
+          reject(new BridgeError("JOB_CANCELLED", "job aborted"));
+        else
+          ctx.abortSignal.addEventListener(
+            "abort",
+            () => reject(new BridgeError("JOB_CANCELLED", "job aborted")),
+            { once: true },
+          );
       });
       const exitPromise = conn.childDone.then((o) => {
-        throw new BridgeError("CHILD_EXITED", `codex app-server exited (code ${o.code}) before the turn completed`);
+        throw new BridgeError(
+          "CHILD_EXITED",
+          `codex app-server exited (code ${o.code}) before the turn completed`,
+        );
       });
 
       let turnResult: unknown;
       try {
-        turnResult = await Promise.race([turnPromise, abortPromise, exitPromise]);
+        turnResult = await Promise.race([
+          turnPromise,
+          abortPromise,
+          exitPromise,
+        ]);
       } catch (err) {
         const be = err as { code?: string; message?: string };
         if (
@@ -454,14 +577,25 @@ export class CodexAppServerAdapter implements AgentAdapter {
             jobId: ctx.jobId,
             nativeId: threadId,
             adapter: this.name,
-            status: cancelled ? "cancelled" : be.code === "CHILD_EXITED" ? "failed" : "timed-out",
+            status: cancelled
+              ? "cancelled"
+              : be.code === "CHILD_EXITED"
+                ? "failed"
+                : "timed-out",
             summary: cancelled
               ? "codex turn cancelled before completion."
               : `codex app-server ended before completing the turn: ${be.message ?? be.code}`,
-            continuation: { supported: true, how: `codex_reply with nativeId=${threadId}` },
+            continuation: {
+              supported: true,
+              how: `codex_reply with nativeId=${threadId}`,
+            },
             startedAt,
             finishedAt: new Date().toISOString(),
-            failure: { code: be.code ?? "ADAPTER_PROTOCOL_ERROR", message: be.message ?? be.code ?? "turn ended early", retriable: !cancelled },
+            failure: {
+              code: be.code ?? "ADAPTER_PROTOCOL_ERROR",
+              message: be.message ?? be.code ?? "turn ended early",
+              retriable: !cancelled,
+            },
           } satisfies JobResult;
         }
         throw err;
@@ -469,7 +603,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
       void turnResult;
 
       const finishedAt = new Date().toISOString();
-      const summaryText = conn.lastAgentMessage() ?? "(codex returned no final message)";
+      const summaryText =
+        conn.lastAgentMessage() ?? "(codex returned no final message)";
       const allItems = conn.items();
       const changed = extractChangedFiles(allItems);
       const commands = extractCommands(allItems);
@@ -496,11 +631,11 @@ export class CodexAppServerAdapter implements AgentAdapter {
       if (changed.length > 0) {
         result.changedFiles = changed;
       }
-      const lastUsage = conn.usages().at(-1) as { total?: Record<string, number> } | undefined;
+      const lastUsage = conn.usages().at(-1) as
+        | { total?: Record<string, number> }
+        | undefined;
       if (lastUsage?.total) {
-        result.findings = [
-          `token usage: ${JSON.stringify(lastUsage.total)}`,
-        ];
+        result.findings = [`token usage: ${JSON.stringify(lastUsage.total)}`];
       }
       return result;
     } finally {
@@ -509,29 +644,49 @@ export class CodexAppServerAdapter implements AgentAdapter {
   }
 
   /** Continue an existing Codex thread with a follow-up message. */
-  async reply(nativeId: string, message: string, ctx: AdapterRunContext): Promise<JobResult> {
+  async reply(
+    nativeId: string,
+    message: string,
+    ctx: AdapterRunContext,
+  ): Promise<JobResult> {
     const startedAt = new Date().toISOString();
     const conn = await this.connect(ctx);
     try {
       // Resume by id (works whether or not the thread is still loaded).
-      await conn.rpc.request("thread/resume", { threadId: nativeId }, TURN_START_TIMEOUT_MS);
+      await conn.rpc.request(
+        "thread/resume",
+        { threadId: nativeId },
+        TURN_START_TIMEOUT_MS,
+      );
       const turnParams: Record<string, unknown> = {
         threadId: nativeId,
         input: [{ type: "text", text: message }],
       };
       const turnPromise = conn.rpc.request("turn/start", turnParams, 0);
       const abortPromise = new Promise<never>((_, reject) => {
-        if (ctx.abortSignal.aborted) reject(new BridgeError("JOB_CANCELLED", "job aborted"));
-        else ctx.abortSignal.addEventListener("abort", () => reject(new BridgeError("JOB_CANCELLED", "job aborted")), { once: true });
+        if (ctx.abortSignal.aborted)
+          reject(new BridgeError("JOB_CANCELLED", "job aborted"));
+        else
+          ctx.abortSignal.addEventListener(
+            "abort",
+            () => reject(new BridgeError("JOB_CANCELLED", "job aborted")),
+            { once: true },
+          );
       });
       const exitPromise = conn.childDone.then(() => {
-        throw new BridgeError("CHILD_EXITED", "codex app-server exited before the follow-up completed");
+        throw new BridgeError(
+          "CHILD_EXITED",
+          "codex app-server exited before the follow-up completed",
+        );
       });
-      await Promise.race([turnPromise, abortPromise, exitPromise]).catch((err) => {
-        conn.shutdown();
-        throw err;
-      });
-      const summaryText = conn.lastAgentMessage() ?? "(codex returned no final message)";
+      await Promise.race([turnPromise, abortPromise, exitPromise]).catch(
+        (err) => {
+          conn.shutdown();
+          throw err;
+        },
+      );
+      const summaryText =
+        conn.lastAgentMessage() ?? "(codex returned no final message)";
       const finishedAt = new Date().toISOString();
       return {
         jobId: ctx.jobId,
@@ -539,7 +694,10 @@ export class CodexAppServerAdapter implements AgentAdapter {
         adapter: this.name,
         status: "completed",
         summary: summaryText.slice(0, 10_000),
-        continuation: { supported: true, how: `codex_reply with nativeId=${nativeId}` },
+        continuation: {
+          supported: true,
+          how: `codex_reply with nativeId=${nativeId}`,
+        },
         startedAt,
         finishedAt,
         failure: null,
@@ -557,7 +715,10 @@ function summarizeItem(item: Record<string, unknown>): Record<string, unknown> {
       type,
       command: item.command,
       exitCode: item.exitCode,
-      aggregatedOutput: typeof item.aggregatedOutput === "string" ? redactString(item.aggregatedOutput.slice(0, 4000)) : undefined,
+      aggregatedOutput:
+        typeof item.aggregatedOutput === "string"
+          ? redactString(item.aggregatedOutput.slice(0, 4000))
+          : undefined,
     };
   }
   if (type === "fileChange") {

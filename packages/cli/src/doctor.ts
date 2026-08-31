@@ -19,8 +19,15 @@ import {
   type BridgeConfig,
 } from "@codex-cursor-bridge/bridge-core";
 import { JobStore } from "@codex-cursor-bridge/job-store";
-import { CodexAppServerAdapter, CodexExecAdapter } from "@codex-cursor-bridge/codex-adapter";
-import { CursorSdkAdapter, CursorAcpAdapter, CursorCliFallbackAdapter } from "@codex-cursor-bridge/cursor-adapter";
+import {
+  CodexAppServerAdapter,
+  CodexExecAdapter,
+} from "@codex-cursor-bridge/codex-adapter";
+import {
+  CursorSdkAdapter,
+  CursorAcpAdapter,
+  CursorCliFallbackAdapter,
+} from "@codex-cursor-bridge/cursor-adapter";
 import { inspectGit } from "@codex-cursor-bridge/orchestrator";
 
 const execFileAsync = promisify(execFile);
@@ -49,7 +56,10 @@ export interface DoctorResult {
   };
 }
 
-export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Promise<DoctorResult> {
+export async function runDoctor(opts: {
+  repoRoot: string;
+  json?: boolean;
+}): Promise<DoctorResult> {
   const checks: Check[] = [];
   const add = (c: Check): void => {
     checks.push(c);
@@ -62,16 +72,29 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
     label: "Node.js version",
     status: nodeMajor >= 20 ? "pass" : "fail",
     detail: `${process.versions.node} (${process.platform} ${process.arch})`,
-    remediation: nodeMajor >= 20 ? undefined : "install Node.js >= 20.19 (https://nodejs.org)",
+    remediation:
+      nodeMajor >= 20
+        ? undefined
+        : "install Node.js >= 20.19 (https://nodejs.org)",
   });
 
-  add({ id: "bridge.version", label: "Bridge version", status: "info", detail: BRIDGE_VERSION });
+  add({
+    id: "bridge.version",
+    label: "Bridge version",
+    status: "info",
+    detail: BRIDGE_VERSION,
+  });
 
   // Git
   const gitInfo = await inspectGit(opts.repoRoot);
   add(
     gitInfo.version
-      ? { id: "git.version", label: "Git", status: "pass", detail: gitInfo.version }
+      ? {
+          id: "git.version",
+          label: "Git",
+          status: "pass",
+          detail: gitInfo.version,
+        }
       : {
           id: "git.version",
           label: "Git",
@@ -92,8 +115,10 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
         id: "git.commits",
         label: "Initial commit",
         status: "warn",
-        detail: "repository has no commits; worktree isolation unavailable until the first commit",
-        remediation: "git commit your initial state, or use read-only delegation",
+        detail:
+          "repository has no commits; worktree isolation unavailable until the first commit",
+        remediation:
+          "git commit your initial state, or use read-only delegation",
       });
     }
   } else {
@@ -102,7 +127,8 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
       label: "Repository detection",
       status: "warn",
       detail: `${opts.repoRoot} is not inside a git repository`,
-      remediation: "run the bridge from inside a repository for worktree isolation and diff summaries",
+      remediation:
+        "run the bridge from inside a repository for worktree isolation and diff summaries",
     });
   }
 
@@ -113,8 +139,12 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
     id: "codex.cli",
     label: "Codex CLI",
     status: codexStatus.available ? "pass" : "warn",
-    detail: codexStatus.available ? `codex ${codexStatus.version}` : (codexStatus.reason ?? "not found"),
-    remediation: codexStatus.available ? undefined : "install: npm i -g @openai/codex",
+    detail: codexStatus.available
+      ? `codex ${codexStatus.version}`
+      : (codexStatus.reason ?? "not found"),
+    remediation: codexStatus.available
+      ? undefined
+      : "install: npm i -g @openai/codex",
   });
   if (codexStatus.available) {
     const probe = await appServer.probe();
@@ -122,18 +152,30 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
       id: "codex.app-server",
       label: "Codex app-server",
       status: probe.ok ? "pass" : "warn",
-      detail: probe.ok ? `initialize ok (${probe.userAgent ?? "app-server"})` : probe.detail,
-      remediation: probe.ok ? undefined : "verify `codex app-server` runs and `codex login status` is OK",
+      detail: probe.ok
+        ? `initialize ok (${probe.userAgent ?? "app-server"})`
+        : probe.detail,
+      remediation: probe.ok
+        ? undefined
+        : "verify `codex app-server` runs and `codex login status` is OK",
     });
     try {
-      const { stdout } = await execFileAsync("codex", ["login", "status"], { timeout: 15_000 });
+      const { stdout } = await execFileAsync("codex", ["login", "status"], {
+        timeout: 15_000,
+      });
       const txt = stdout.toLowerCase();
-      const ok = !(txt.includes("not logged in") || txt.includes("logged out") || txt.trim().length === 0);
+      const ok = !(
+        txt.includes("not logged in") ||
+        txt.includes("logged out") ||
+        txt.trim().length === 0
+      );
       add({
         id: "codex.auth",
         label: "Codex authentication",
         status: ok ? "pass" : "warn",
-        detail: ok ? "login status OK (value withheld)" : stdout.trim().slice(0, 120) || "no login detected",
+        detail: ok
+          ? "login status OK (value withheld)"
+          : stdout.trim().slice(0, 120) || "no login detected",
         remediation: ok
           ? undefined
           : "run `codex login` (ChatGPT account) or `printenv OPENAI_API_KEY | codex login --with-api-key`",
@@ -154,7 +196,9 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
     id: "codex.exec-fallback",
     label: "Codex exec fallback",
     status: execStatus.available ? "pass" : "warn",
-    detail: execStatus.available ? "available (one-shot; no live thread continuation)" : "codex CLI missing",
+    detail: execStatus.available
+      ? "available (one-shot; no live thread continuation)"
+      : "codex CLI missing",
   });
 
   // Cursor
@@ -164,8 +208,12 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
     id: "cursor.sdk",
     label: "Cursor SDK (@cursor/sdk)",
     status: sdkStatus.available ? "pass" : "info",
-    detail: sdkStatus.available ? "available" : (sdkStatus.reason ?? "unavailable"),
-    remediation: sdkStatus.available ? undefined : "optional: npm i -g @cursor/sdk and set CURSOR_API_KEY for server-side agents",
+    detail: sdkStatus.available
+      ? "available"
+      : (sdkStatus.reason ?? "unavailable"),
+    remediation: sdkStatus.available
+      ? undefined
+      : "optional: npm i -g @cursor/sdk and set CURSOR_API_KEY for server-side agents",
   });
   add({
     id: "cursor.api-key",
@@ -183,8 +231,12 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
     id: "cursor.cli",
     label: "Cursor CLI (cursor-agent)",
     status: acpStatus.available ? "pass" : "info",
-    detail: acpStatus.available ? `cursor-agent ${acpStatus.version}` : (acpStatus.reason ?? "not found"),
-    remediation: acpStatus.available ? undefined : "optional: npm i -g cursor-agent, then `cursor-agent login`",
+    detail: acpStatus.available
+      ? `cursor-agent ${acpStatus.version}`
+      : (acpStatus.reason ?? "not found"),
+    remediation: acpStatus.available
+      ? undefined
+      : "optional: npm i -g cursor-agent, then `cursor-agent login`",
   });
   if (acpStatus.available) {
     const probe = await probeAcp();
@@ -193,10 +245,14 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
       label: "Cursor ACP",
       status: probe.ok ? "pass" : "warn",
       detail: probe.detail,
-      remediation: probe.ok ? undefined : "run `cursor-agent acp` manually; check `cursor-agent login`",
+      remediation: probe.ok
+        ? undefined
+        : "run `cursor-agent acp` manually; check `cursor-agent login`",
     });
   }
-  const cliFallback = new CursorCliFallbackAdapter({ allowNonInteractive: true });
+  const cliFallback = new CursorCliFallbackAdapter({
+    allowNonInteractive: true,
+  });
   const cliStatus = await cliFallback.isAvailable();
   add({
     id: "cursor.cli-fallback",
@@ -217,35 +273,61 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
       id: "cursor.adapter-selection",
       label: "Cursor adapter selection",
       status: selection ? "info" : "warn",
-      detail: selection ?? "no adapter currently selectable (sdk/acp/cli all unavailable)",
+      detail:
+        selection ??
+        "no adapter currently selectable (sdk/acp/cli all unavailable)",
     });
   } catch {
     loadedConfig = loadConfig(opts.repoRoot, undefined).config;
-    add({ id: "cursor.adapter-selection", label: "Cursor adapter selection", status: "warn", detail: "evaluation failed" });
+    add({
+      id: "cursor.adapter-selection",
+      label: "Cursor adapter selection",
+      status: "warn",
+      detail: "evaluation failed",
+    });
   }
 
   // State directories
   try {
     fs.mkdirSync(jobsDir(), { recursive: true, mode: 0o700 });
     fs.accessSync(jobsDir(), fs.constants.W_OK);
-    add({ id: "state.jobs-dir", label: "Job state directory", status: "pass", detail: `${jobsDir()} (writable)` });
+    add({
+      id: "state.jobs-dir",
+      label: "Job state directory",
+      status: "pass",
+      detail: `${jobsDir()} (writable)`,
+    });
   } catch (err) {
     add({
       id: "state.jobs-dir",
       label: "Job state directory",
       status: "fail",
       detail: `${jobsDir()} is not writable: ${(err as Error).message}`,
-      remediation: "fix permissions or set CCB_STATE_DIR to a writable directory",
+      remediation:
+        "fix permissions or set CCB_STATE_DIR to a writable directory",
     });
   }
-  add({ id: "state.root", label: "State root", status: "info", detail: stateRoot() });
-  add({ id: "state.worktrees", label: "Worktree root", status: "info", detail: defaultWorktreeRoot() });
+  add({
+    id: "state.root",
+    label: "State root",
+    status: "info",
+    detail: stateRoot(),
+  });
+  add({
+    id: "state.worktrees",
+    label: "Worktree root",
+    status: "info",
+    detail: defaultWorktreeRoot(),
+  });
 
   // Stale/conflicting jobs
   try {
     const store = new JobStore({ jobsDir: jobsDir() });
     const jobs = store.list();
-    const nonTerminal = jobs.filter((j) => !["completed", "failed", "cancelled", "timed-out"].includes(j.status));
+    const nonTerminal = jobs.filter(
+      (j) =>
+        !["completed", "failed", "cancelled", "timed-out"].includes(j.status),
+    );
     add({
       id: "state.jobs",
       label: "Existing jobs",
@@ -256,7 +338,12 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
           : `${jobs.length} job(s), ${nonTerminal.length} non-terminal${nonTerminal.length > 0 ? " (run `jobs recover` after a crash)" : ""}`,
     });
   } catch {
-    add({ id: "state.jobs", label: "Existing jobs", status: "info", detail: "no jobs yet" });
+    add({
+      id: "state.jobs",
+      label: "Existing jobs",
+      status: "info",
+      detail: "no jobs yet",
+    });
   }
 
   // Config summary
@@ -274,13 +361,22 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
     "codex-cursor-bridge doctor",
     "",
     ...checks.map((c) => {
-      const icon = c.status === "pass" ? "✓" : c.status === "fail" ? "✗" : c.status === "warn" ? "!" : "·";
+      const icon =
+        c.status === "pass"
+          ? "✓"
+          : c.status === "fail"
+            ? "✗"
+            : c.status === "warn"
+              ? "!"
+              : "·";
       let line = `${icon} ${c.label}: ${c.detail}`;
       if (c.remediation) line += `\n    → ${c.remediation}`;
       return line;
     }),
     "",
-    blocking.length > 0 ? `${blocking.length} blocking issue(s); see remediations above.` : "No blocking issues.",
+    blocking.length > 0
+      ? `${blocking.length} blocking issue(s); see remediations above.`
+      : "No blocking issues.",
   ].join("\n");
 
   return {
@@ -300,7 +396,7 @@ export async function runDoctor(opts: { repoRoot: string; json?: boolean }): Pro
 
 async function probeAcp(): Promise<{ ok: boolean; detail: string }> {
   return new Promise((resolve) => {
-    let child: import("node:child_process").ChildProcess;
+    let child: ReturnType<typeof execFile>;
     try {
       const bin = process.env.CCB_CURSOR_BINARY ?? "cursor-agent";
       child = execFile(bin, ["acp"], { timeout: 15_000 }, () => {});
@@ -327,20 +423,32 @@ async function probeAcp(): Promise<{ ok: boolean; detail: string }> {
     });
     child.stderr?.on("data", () => {});
     child.on("error", (err) => done(false, `ACP spawn error: ${err.message}`));
-    child.on("exit", () => done(false, "ACP exited without responding to initialize"));
+    child.on("exit", () =>
+      done(false, "ACP exited without responding to initialize"),
+    );
     child.stdin?.write(
-      JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: 1, clientCapabilities: {} } }) + "\n",
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: 1, clientCapabilities: {} },
+      }) + "\n",
     );
     setTimeout(() => done(false, "no ACP response within timeout"), 12_000);
   });
 }
 
-async function selectAdapterQuietly(config: BridgeConfig): Promise<string | null> {
+async function selectAdapterQuietly(
+  config: BridgeConfig,
+): Promise<string | null> {
   try {
-    const { selectCursorAdapter } = await import("@codex-cursor-bridge/cursor-adapter");
+    const { selectCursorAdapter } =
+      await import("@codex-cursor-bridge/cursor-adapter");
     const sel = await selectCursorAdapter({
       config,
-      ...(config.cursorBinaryPath ? { cursorBinaryPath: config.cursorBinaryPath } : {}),
+      ...(config.cursorBinaryPath
+        ? { cursorBinaryPath: config.cursorBinaryPath }
+        : {}),
     });
     return `${sel.adapter.name} (${sel.selectionReason})`;
   } catch {

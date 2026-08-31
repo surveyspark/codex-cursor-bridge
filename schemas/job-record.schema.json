@@ -61,7 +61,11 @@
       ]
     },
     "permissionProfile": {
-      "enum": ["read-only", "isolated-workspace-write", "current-workspace-write"]
+      "enum": [
+        "read-only",
+        "isolated-workspace-write",
+        "current-workspace-write"
+      ]
     },
     "handoffDepth": { "type": "integer", "minimum": 0, "maximum": 2 },
     "maxHandoffDepth": { "type": "integer", "minimum": 0, "maximum": 2 },
@@ -163,7 +167,9 @@
           "ts": { "type": "string", "format": "date-time" },
           "kind": { "type": "string", "maxLength": 100 },
           "summary": { "type": "string", "maxLength": 4000 },
-          "decision": { "enum": ["approved", "denied", "timed-out", "auto-denied"] },
+          "decision": {
+            "enum": ["approved", "denied", "timed-out", "auto-denied"]
+          },
           "reason": { "type": "string", "maxLength": 2000 }
         }
       }

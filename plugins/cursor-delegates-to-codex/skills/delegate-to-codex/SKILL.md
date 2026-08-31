@@ -17,14 +17,14 @@ Codex thread id back, and you stay responsible for the final answer to the user.
 
 ## Step 1 — choose the mode
 
-| Mode | Use when | Writes? |
-|------|----------|---------|
-| `investigate` | root-cause an unfamiliar or stubborn failure | no |
-| `review` | correctness/security review of a diff or subsystem | no |
-| `adversarial-review` | actively try to break the current approach | no |
-| `rescue` | 2+ implementation attempts failed; diagnose why | no |
-| `plan` | architecture/multi-file plan before touching code | no |
-| `implement` | you have a precise, validated change to make | yes (isolated worktree by default) |
+| Mode                 | Use when                                           | Writes?                            |
+| -------------------- | -------------------------------------------------- | ---------------------------------- |
+| `investigate`        | root-cause an unfamiliar or stubborn failure       | no                                 |
+| `review`             | correctness/security review of a diff or subsystem | no                                 |
+| `adversarial-review` | actively try to break the current approach         | no                                 |
+| `rescue`             | 2+ implementation attempts failed; diagnose why    | no                                 |
+| `plan`               | architecture/multi-file plan before touching code  | no                                 |
+| `implement`          | you have a precise, validated change to make       | yes (isolated worktree by default) |
 
 ## Step 2 — gather only useful context
 
@@ -32,7 +32,7 @@ Compose the `task` field precisely:
 
 1. One-paragraph statement of the problem and the desired deliverable.
 2. Relevant repository facts (paths, symbols, commands already tried).
-3. Previous failed approaches — the *approach*, not the whole transcript.
+3. Previous failed approaches — the _approach_, not the whole transcript.
 4. Explicit constraints (files that must not change, required test commands).
 5. Expected output: what the final report must contain.
 

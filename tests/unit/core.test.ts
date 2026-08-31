@@ -21,7 +21,9 @@ describe("handoff plan validation", () => {
     schemaVersion: "1.0",
     task: "Add a health endpoint",
     goal: "LB liveness",
-    observedRepositoryFacts: [{ fact: "Express app in src/app.ts", evidence: ["src/app.ts:createApp"] }],
+    observedRepositoryFacts: [
+      { fact: "Express app in src/app.ts", evidence: ["src/app.ts:createApp"] },
+    ],
     implementationSteps: [
       {
         id: "step-1",
@@ -47,7 +49,10 @@ describe("handoff plan validation", () => {
   });
 
   it("rejects empty observedRepositoryFacts", () => {
-    const r = validateHandoffPlan({ ...validPlan, observedRepositoryFacts: [] });
+    const r = validateHandoffPlan({
+      ...validPlan,
+      observedRepositoryFacts: [],
+    });
     expect(r.ok).toBe(false);
   });
 
@@ -74,7 +79,13 @@ describe("handoff plan validation", () => {
     const r = validateHandoffPlan({
       ...validPlan,
       implementationSteps: [
-        { id: "step-1", description: "a", rationale: "b", dependsOn: ["step-9"], verification: ["v"] },
+        {
+          id: "step-1",
+          description: "a",
+          rationale: "b",
+          dependsOn: ["step-9"],
+          verification: ["v"],
+        },
       ],
     });
     expect(r.ok).toBe(false);
@@ -151,12 +162,20 @@ describe("start request validation", () => {
   });
 
   it("rejects unknown mode", () => {
-    const r = validateStartRequest({ task: "x", cwd: "/tmp", mode: "teleport" });
+    const r = validateStartRequest({
+      task: "x",
+      cwd: "/tmp",
+      mode: "teleport",
+    });
     expect(r.ok).toBe(false);
   });
 
   it("rejects unknown permissionProfile", () => {
-    const r = validateStartRequest({ task: "x", cwd: "/tmp", permissionProfile: "world-write" });
+    const r = validateStartRequest({
+      task: "x",
+      cwd: "/tmp",
+      permissionProfile: "world-write",
+    });
     expect(r.ok).toBe(false);
   });
 
@@ -176,27 +195,33 @@ describe("redaction", () => {
   });
 
   it("redacts bearer tokens", () => {
-    const { text } = redactSecrets("Authorization: Bearer abc.def.ghi-jkl-1234567890");
+    const { text } = redactSecrets(
+      "Authorization: Bearer abc.def.ghi-jkl-1234567890",
+    );
     expect(text).toContain("***REDACTED***");
     expect(text).not.toContain("abc.def.ghi-jkl-1234567890");
   });
 
   it("redacts private keys", () => {
-    const pem = "-----BEGIN RSA PRIVATE KEY-----\nMIIabc\nMIIdef\n-----END RSA PRIVATE KEY-----";
+    const pem =
+      "-----BEGIN RSA PRIVATE KEY-----\nMIIabc\nMIIdef\n-----END RSA PRIVATE KEY-----";
     const { text } = redactSecrets(`before ${pem} after`);
     expect(text).toContain("***REDACTED-PRIVATE-KEY***");
     expect(text).not.toContain("MIIabc");
   });
 
   it("redacts cookies and jwt", () => {
-    const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+    const jwt =
+      "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
     const { text } = redactSecrets(`set-cookie: session=${jwt}; x=${jwt}`);
     expect(text).toContain("***REDACTED***");
     expect(text).not.toContain("SflKxwRJSMeKKF2");
   });
 
   it("redacts password assignments", () => {
-    const { text } = redactSecrets("password: hunter2secret api_key = 'abcdef123456'");
+    const { text } = redactSecrets(
+      "password: hunter2secret api_key = 'abcdef123456'",
+    );
     expect(text).toContain("***REDACTED***");
     expect(text).not.toContain("hunter2secret");
   });
@@ -239,7 +264,11 @@ describe("path safety", () => {
   });
 
   it("worktree dir names are filesystem safe", () => {
-    const name = worktreeDirName("/repo/my project", "job_0123456789abcdef0123456789abcdef", "feature/with:colon");
+    const name = worktreeDirName(
+      "/repo/my project",
+      "job_0123456789abcdef0123456789abcdef",
+      "feature/with:colon",
+    );
     expect(name).not.toMatch(/[:\s]/);
     expect(name).toContain("01234567");
   });
@@ -250,20 +279,31 @@ describe("job state transitions", () => {
     expect(() => assertTransitionSafe("queued", "starting")).not.toThrow();
   });
   it("rejects queued -> completed", () => {
-    expect(() => assertTransitionSafe("queued", "completed")).toThrow(/invalid job status transition/);
+    expect(() => assertTransitionSafe("queued", "completed")).toThrow(
+      /invalid job status transition/,
+    );
   });
   it("rejects completed -> anything", () => {
     expect(() => assertTransitionSafe("completed", "running")).toThrow();
     expect(() => assertTransitionSafe("completed", "failed")).toThrow();
   });
   it("allows running -> terminal states", () => {
-    for (const s of ["completed", "failed", "cancelled", "timed-out"] as const) {
+    for (const s of [
+      "completed",
+      "failed",
+      "cancelled",
+      "timed-out",
+    ] as const) {
       expect(() => assertTransitionSafe("running", s)).not.toThrow();
     }
   });
   it("allows waiting states back to running", () => {
-    expect(() => assertTransitionSafe("waiting-for-approval", "running")).not.toThrow();
-    expect(() => assertTransitionSafe("waiting-for-input", "running")).not.toThrow();
+    expect(() =>
+      assertTransitionSafe("waiting-for-approval", "running"),
+    ).not.toThrow();
+    expect(() =>
+      assertTransitionSafe("waiting-for-input", "running"),
+    ).not.toThrow();
   });
 });
 
