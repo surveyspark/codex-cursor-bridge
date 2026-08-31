@@ -1,0 +1,5 @@
+# Normalize line endings: prettier enforces LF everywhere.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.zip binary
