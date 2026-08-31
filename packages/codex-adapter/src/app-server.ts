@@ -409,11 +409,12 @@ export class CodexAppServerAdapter implements AgentAdapter {
       } catch (err) {
         const be = err as { code?: string };
         if (be.code === "JOB_CANCELLED" || be.code === "CHILD_EXITED" || be.code === "ADAPTER_TIMEOUT") {
-          // Interrupt the running turn first, then tear down.
+          // Interrupt the running turn, but do not block on the reply: the
+          // transport may already be closing during cancellation.
           const t = conn.threads.get(threadId);
           if (t?.turnId) {
-            await conn.rpc
-              .request("turn/interrupt", { threadId, turnId: t.turnId }, 10_000)
+            void conn.rpc
+              .request("turn/interrupt", { threadId, turnId: t.turnId }, 2_000)
               .catch(() => {});
           }
           conn.shutdown();

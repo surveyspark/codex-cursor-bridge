@@ -63,6 +63,7 @@ export class JobManager {
   private running = 0;
   private readonly queue: Array<() => void> = [];
   private readonly aborts = new Map<string, AbortController>();
+  private readonly cancelReasons = new Map<string, string>();
 
   constructor(opts: JobManagerOptions) {
     const loaded = loadConfig(opts.repoRoot, opts.config);
@@ -105,8 +106,8 @@ export class JobManager {
       background: request.background ?? true,
       origin: {
         host: origin.host,
-        requestId: request.origin?.requestId,
-        parentJobId: request.origin?.parentJobId,
+        ...(request.origin?.requestId ? { requestId: request.origin.requestId } : {}),
+        ...(request.origin?.parentJobId ? { parentJobId: request.origin.parentJobId } : {}),
         handoffDepth: request.origin?.handoffDepth ?? 0,
         maxHandoffDepth: request.origin?.maxHandoffDepth ?? this.config.maxHandoffDepth,
       },
@@ -189,10 +190,26 @@ export class JobManager {
     if (record.status !== "queued") {
       throw new BridgeError("JOB_INVALID_TRANSITION", `job ${jobId} is ${record.status}, expected queued`);
     }
-    const git = await inspectGit(record.cwd);
-    await this.gate();
+    // Register the abort controller before any await so a cancel() racing
+    // with startup still reaches the adapter.
     const abort = new AbortController();
     this.aborts.set(jobId, abort);
+    if (abort.signal.aborted) {
+      // cancel() already ran during startup: record and return.
+      return await this.finalize(jobId, {
+        jobId,
+        nativeId: null,
+        adapter: record.adapter,
+        status: "cancelled",
+        summary: "job cancelled before the agent started.",
+        continuation: { supported: false, how: "job never started" },
+        startedAt: null,
+        finishedAt: new Date().toISOString(),
+        failure: { code: "JOB_CANCELLED", message: "cancelled during startup", retriable: false },
+      }, record.cwd);
+    }
+    const git = await inspectGit(record.cwd);
+    await this.gate();
     const timeout = setTimeout(() => abort.abort(new Error("timeout")), record.timeoutMs ?? this.config.defaultTimeoutMs);
 
     try {
@@ -215,7 +232,7 @@ export class JobManager {
           repoRoot: this.repoRoot,
           worktreeRoot: this.config.worktreeRoot ?? defaultWorktreeRoot(),
           jobId,
-          baseRef: request.baseRef,
+          ...(request.baseRef ? { baseRef: request.baseRef } : {}),
         });
         cwd = wt.path;
         this.store.update(jobId, (r) => {
@@ -261,8 +278,13 @@ export class JobManager {
       return await this.finalize(jobId, result, record.cwd);
     } catch (err) {
       const be = asBridgeError(err);
+      const abortedExplicitly = this.cancelReasons.get(jobId) !== undefined;
       const status =
-        be.code === "JOB_CANCELLED" ? "cancelled" : be.code === "JOB_TIMEOUT" || abort.signal.aborted ? "timed-out" : "failed";
+        be.code === "JOB_CANCELLED" || abortedExplicitly
+          ? "cancelled"
+          : be.code === "JOB_TIMEOUT" || abort.signal.aborted
+            ? "timed-out"
+            : "failed";
       const result: JobResult = {
         jobId,
         nativeId: this.store.tryGet(jobId)?.nativeId ?? null,
@@ -283,6 +305,7 @@ export class JobManager {
     } finally {
       clearTimeout(timeout);
       this.aborts.delete(jobId);
+      this.cancelReasons.delete(jobId);
       this.release();
     }
   }
@@ -337,6 +360,7 @@ export class JobManager {
     if (["completed", "failed", "cancelled", "timed-out"].includes(record.status)) {
       throw new BridgeError("JOB_ALREADY_TERMINAL", `job ${jobId} already finished as ${record.status}`);
     }
+    this.cancelReasons.set(jobId, reason);
     const abort = this.aborts.get(jobId);
     if (abort) {
       abort.abort(new Error(reason));
@@ -385,7 +409,7 @@ export class JobManager {
       return { accepted: false, note: "job has no native session id to continue" };
     }
     this.store.update(jobId, (r) => {
-      r.followUps = [...(r.followUps ?? []), { ts: new Date().toISOString(), message, accepted: undefined }];
+      r.followUps = [...(r.followUps ?? []), { ts: new Date().toISOString(), message }];
     });
     this.store.appendEvent(jobId, { type: "followup.requested", data: { nativeId: record.nativeId } });
     return { accepted: true };
@@ -440,7 +464,7 @@ export class JobManager {
         host: record.originHost,
         handoffDepth: record.handoffDepth,
         maxHandoffDepth: record.maxHandoffDepth,
-        parentJobId: record.parentJobId ?? undefined,
+        ...(record.parentJobId ? { parentJobId: record.parentJobId } : {}),
       },
     };
   }
