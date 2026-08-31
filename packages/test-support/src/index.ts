@@ -25,7 +25,9 @@ export interface TempRepoOptions {
 }
 
 /** Create an isolated temporary git repository. */
-export async function makeTempRepo(opts: TempRepoOptions = {}): Promise<{ root: string; cleanup: () => void }> {
+export async function makeTempRepo(
+  opts: TempRepoOptions = {},
+): Promise<{ root: string; repo: string; cleanup: () => void }> {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-test-repo-"));
   const run = async (args: string[]): Promise<void> => {
     await execFileAsync("git", args, { cwd: root, env: GIT_ENV(), timeout: 30_000 });
@@ -33,6 +35,7 @@ export async function makeTempRepo(opts: TempRepoOptions = {}): Promise<{ root: 
   await run(["init", "--initial-branch=main", "."]);
   await run(["config", "user.name", "bridge-test"]);
   await run(["config", "user.email", "test@example.invalid"]);
+  fs.writeFileSync(path.join(root, ".gitignore"), ".state/\n.handoff/\n");
   for (const [rel, content] of Object.entries(opts.files ?? { "src/index.ts": "export const x = 1;\n" })) {
     const file = path.join(root, rel);
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -44,6 +47,9 @@ export async function makeTempRepo(opts: TempRepoOptions = {}): Promise<{ root: 
   }
   return {
     root,
+    get repo() {
+      return root;
+    },
     cleanup: () => {
       try {
         fs.rmSync(root, { recursive: true, force: true });

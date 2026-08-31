@@ -185,15 +185,21 @@ export class CursorAcpAdapter implements AgentAdapter {
       }
     }
 
-    const promptResult = (await rpc.request(
-      "session/prompt",
-      { sessionId: activeSession, prompt: [{ type: "text", text: prompt }] },
-      0,
-    )) as { stopReason?: string } | null;
+    let promptResult: { stopReason?: string } | null = null;
+    try {
+      promptResult = (await Promise.race([
+        rpc.request("session/prompt", { sessionId: activeSession, prompt: [{ type: "text", text: prompt }] }, 0),
+        child.done.then(() => null),
+      ])) as { stopReason?: string } | null;
+    } finally {
+      // Ensure the child never outlives the prompt (fakes and real agents
+      // keep stdin open; the transport is done once the turn ends).
+      rpc.close();
+      await child.killTree().catch(() => {});
+    }
     stopReason = promptResult?.stopReason ?? null;
 
-    const exit = await child.done;
-    rpc.close();
+    const exit = await child.done.catch(() => ({ code: null }));
     const finishedAt = new Date().toISOString();
 
     if (ctx.abortSignal.aborted) {

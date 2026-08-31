@@ -170,12 +170,16 @@ export class CodexAppServerAdapter implements AgentAdapter {
     rpc: JsonRpcConnection;
     threads: Map<string, ThreadInfo>;
     waitExit: Promise<void>;
+    childDone: Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
     shutdown: () => void;
     lastAgentMessage: () => string | null;
     items: () => Array<{ item: Record<string, unknown>; kind: string }>;
     usages: () => Array<Record<string, unknown>>;
     turnErrors: () => Array<Record<string, unknown>>;
   }> {
+    if (ctx.abortSignal.aborted) {
+      throw new BridgeError("JOB_CANCELLED", "cancelled before the agent process started");
+    }
     const child = spawnProcess({
       cwd: ctx.cwd,
       argv: this.argv(),
@@ -323,23 +327,31 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const waitExit = child.done
       .then((outcome) => {
         reader.end();
-        rpc.close();
+        // Do NOT close the rpc here: a pending request's rejection would win
+        // the exit race with the wrong error. shutdown() closes it.
         if (outcome.code !== 0 && !outcome.timedOut) {
           ctx.emit({ type: "codex.exit", level: "warn", data: { code: outcome.code, signal: outcome.signal } });
         }
       })
       .catch(() => {});
 
-    // Initialize handshake.
+    // Initialize handshake (racing an early cancel).
+    const abortInit = new Promise<never>((_, reject) => {
+      if (ctx.abortSignal.aborted) reject(new BridgeError("JOB_CANCELLED", "cancelled during initialize"));
+      else ctx.abortSignal.addEventListener("abort", () => reject(new BridgeError("JOB_CANCELLED", "cancelled during initialize")), { once: true });
+    });
     const initTimeout = setTimeout(() => {
       child.killTree().catch(() => {});
     }, INIT_TIMEOUT_MS);
     try {
-      await rpc.request(
-        "initialize",
-        { clientInfo: { name: "codex-cursor-bridge", title: "codex-cursor-bridge", version: "0.1.0" } },
-        INIT_TIMEOUT_MS,
-      );
+      await Promise.race([
+        rpc.request(
+          "initialize",
+          { clientInfo: { name: "codex-cursor-bridge", title: "codex-cursor-bridge", version: "0.1.0" } },
+          INIT_TIMEOUT_MS,
+        ),
+        abortInit,
+      ]);
       rpc.notify("initialized");
     } finally {
       clearTimeout(initTimeout);
@@ -349,6 +361,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       rpc,
       threads,
       waitExit,
+      childDone: child.done.then((o) => ({ code: o.code, signal: o.signal })),
       shutdown: () => {
         rpc.close();
         child.killTree().catch(() => {});
@@ -362,6 +375,19 @@ export class CodexAppServerAdapter implements AgentAdapter {
 
   async run(request: StartRequest, ctx: AdapterRunContext): Promise<JobResult> {
     const startedAt = new Date().toISOString();
+    if (ctx.abortSignal.aborted) {
+      return {
+        jobId: ctx.jobId,
+        nativeId: null,
+        adapter: this.name,
+        status: "cancelled",
+        summary: "codex job cancelled before the agent started.",
+        continuation: { supported: false, how: "job never started" },
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        failure: { code: "JOB_CANCELLED", message: "cancelled during startup", retriable: false },
+      };
+    }
     const sandbox = mapProfileToSandbox(request.permissionProfile, ctx.cwd, ctx.networkPolicy);
     const conn = await this.connect(ctx);
     const warnings: string[] = [];
@@ -399,16 +425,21 @@ export class CodexAppServerAdapter implements AgentAdapter {
         if (ctx.abortSignal.aborted) reject(new BridgeError("JOB_CANCELLED", "job aborted"));
         else ctx.abortSignal.addEventListener("abort", () => reject(new BridgeError("JOB_CANCELLED", "job aborted")), { once: true });
       });
-      const exitPromise = conn.waitExit.then(() => {
-        throw new BridgeError("CHILD_EXITED", "codex app-server exited before the turn completed");
+      const exitPromise = conn.childDone.then((o) => {
+        throw new BridgeError("CHILD_EXITED", `codex app-server exited (code ${o.code}) before the turn completed`);
       });
 
       let turnResult: unknown;
       try {
         turnResult = await Promise.race([turnPromise, abortPromise, exitPromise]);
       } catch (err) {
-        const be = err as { code?: string };
-        if (be.code === "JOB_CANCELLED" || be.code === "CHILD_EXITED" || be.code === "ADAPTER_TIMEOUT") {
+        const be = err as { code?: string; message?: string };
+        if (
+          be.code === "JOB_CANCELLED" ||
+          be.code === "CHILD_EXITED" ||
+          be.code === "ADAPTER_TIMEOUT" ||
+          be.code === "ADAPTER_PROTOCOL_ERROR"
+        ) {
           // Interrupt the running turn, but do not block on the reply: the
           // transport may already be closing during cancellation.
           const t = conn.threads.get(threadId);
@@ -418,7 +449,20 @@ export class CodexAppServerAdapter implements AgentAdapter {
               .catch(() => {});
           }
           conn.shutdown();
-          throw err;
+          const cancelled = be.code === "JOB_CANCELLED";
+          return {
+            jobId: ctx.jobId,
+            nativeId: threadId,
+            adapter: this.name,
+            status: cancelled ? "cancelled" : be.code === "CHILD_EXITED" ? "failed" : "timed-out",
+            summary: cancelled
+              ? "codex turn cancelled before completion."
+              : `codex app-server ended before completing the turn: ${be.message ?? be.code}`,
+            continuation: { supported: true, how: `codex_reply with nativeId=${threadId}` },
+            startedAt,
+            finishedAt: new Date().toISOString(),
+            failure: { code: be.code ?? "ADAPTER_PROTOCOL_ERROR", message: be.message ?? be.code ?? "turn ended early", retriable: !cancelled },
+          } satisfies JobResult;
         }
         throw err;
       }
@@ -475,15 +519,15 @@ export class CodexAppServerAdapter implements AgentAdapter {
         threadId: nativeId,
         input: [{ type: "text", text: message }],
       };
-      await conn.rpc.request("turn/start", turnParams, 0);
+      const turnPromise = conn.rpc.request("turn/start", turnParams, 0);
       const abortPromise = new Promise<never>((_, reject) => {
         if (ctx.abortSignal.aborted) reject(new BridgeError("JOB_CANCELLED", "job aborted"));
         else ctx.abortSignal.addEventListener("abort", () => reject(new BridgeError("JOB_CANCELLED", "job aborted")), { once: true });
       });
-      const exitPromise = conn.waitExit.then(() => {
+      const exitPromise = conn.childDone.then(() => {
         throw new BridgeError("CHILD_EXITED", "codex app-server exited before the follow-up completed");
       });
-      await Promise.race([abortPromise, exitPromise]).catch((err) => {
+      await Promise.race([turnPromise, abortPromise, exitPromise]).catch((err) => {
         conn.shutdown();
         throw err;
       });

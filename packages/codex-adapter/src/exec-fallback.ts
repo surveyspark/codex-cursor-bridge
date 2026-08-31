@@ -33,6 +33,8 @@ export interface CodexExecAdapterOptions {
   /** Extra args inserted before the prompt (used by tests to point at fakes). */
   extraArgs?: string[];
   extraEnv?: Record<string, string>;
+  /** Test/demo hook: full argv override to spawn a fake CLI. */
+  argvOverride?: string[];
 }
 
 interface ExecEvent {
@@ -46,7 +48,13 @@ export class CodexExecAdapter implements AgentAdapter {
   constructor(private readonly opts: CodexExecAdapterOptions = {}) {}
 
   private binary(): string {
+    if (this.opts.argvOverride) return this.opts.argvOverride[0]!;
     return this.opts.codexBinaryPath ?? process.env.CCB_CODEX_BINARY ?? "codex";
+  }
+
+  private execArgs(): string[] {
+    if (this.opts.argvOverride) return this.opts.argvOverride.slice(1);
+    return ["exec"];
   }
 
   async isAvailable(): Promise<AdapterAvailability> {
@@ -72,21 +80,12 @@ export class CodexExecAdapter implements AgentAdapter {
   async run(request: StartRequest, ctx: AdapterRunContext): Promise<JobResult> {
     const startedAt = new Date().toISOString();
     const sandbox = mapProfileToSandbox(request.permissionProfile, ctx.cwd, ctx.networkPolicy);
-    const sandboxFlag =
-      sandbox.sandboxMode === "read-only"
-        ? "--sandbox"
-        : sandbox.sandboxMode === "workspace-write"
-          ? "--sandbox"
-          : "--sandbox";
-    const sandboxValue =
-      sandbox.sandboxMode === "read-only" ? "read-only" : sandbox.sandboxMode === "workspace-write" ? "workspace-write" : "read-only";
-
     const argv = [
       this.binary(),
-      "exec",
+      ...this.execArgs(),
       "--json",
-      sandboxFlag,
-      sandboxValue,
+      "--sandbox",
+      sandbox.sandboxMode,
       "--skip-git-repo-check",
       "-C",
       ctx.cwd,

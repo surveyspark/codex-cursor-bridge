@@ -64,6 +64,10 @@ export class JobManager {
   private readonly queue: Array<() => void> = [];
   private readonly aborts = new Map<string, AbortController>();
   private readonly cancelReasons = new Map<string, string>();
+  /** Request metadata not representable in schema v1.0 job records
+   *  (constraints/expectedOutput/model/effort/baseRef). Process-local by
+   *  design: MCP tools run jobs synchronously; CLI start waits. */
+  private readonly requestMeta = new Map<string, Pick<StartRequest, "constraints" | "expectedOutput" | "model" | "reasoningEffort" | "baseRef">>();
 
   constructor(opts: JobManagerOptions) {
     const loaded = loadConfig(opts.repoRoot, opts.config);
@@ -160,8 +164,14 @@ export class JobManager {
       ...(git.isGit ? {} : {}),
     });
 
-    // Stash the normalized request for the runner (task field carries the prompt;
-    // we persist the full request in events for transparency with redaction).
+    // Stash request metadata for the runner (job record keeps the prompt only).
+    this.requestMeta.set(jobId, {
+      ...(requestNorm.constraints ? { constraints: requestNorm.constraints } : {}),
+      ...(requestNorm.expectedOutput ? { expectedOutput: requestNorm.expectedOutput } : {}),
+      ...(requestNorm.model ? { model: requestNorm.model } : {}),
+      ...(requestNorm.reasoningEffort ? { reasoningEffort: requestNorm.reasoningEffort } : {}),
+      ...(requestNorm.baseRef ? { baseRef: requestNorm.baseRef } : {}),
+    });
     this.store.appendEvent(jobId, {
       type: "job.enqueued",
       data: {
@@ -306,6 +316,7 @@ export class JobManager {
       clearTimeout(timeout);
       this.aborts.delete(jobId);
       this.cancelReasons.delete(jobId);
+      this.requestMeta.delete(jobId);
       this.release();
     }
   }
@@ -454,6 +465,7 @@ export class JobManager {
   }
 
   private requestFromRecord(record: JobRecord): StartRequest {
+    const meta = this.requestMeta.get(record.jobId) ?? {};
     return {
       task: record.task,
       cwd: record.cwd,
@@ -466,6 +478,7 @@ export class JobManager {
         maxHandoffDepth: record.maxHandoffDepth,
         ...(record.parentJobId ? { parentJobId: record.parentJobId } : {}),
       },
+      ...meta,
     };
   }
 }

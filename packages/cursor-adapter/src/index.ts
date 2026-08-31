@@ -84,13 +84,11 @@ export async function selectCursorAdapter(
       return { adapter, selectionReason: reason, allStatuses: statuses };
     }
     if (preferred === candidate.key) {
-      // Explicit preference unavailable: report and stop unless auto allows more.
-      if (preferred !== "auto") {
-        throw new BridgeError(
-          "ADAPTER_NOT_AVAILABLE",
-          `preferred cursor adapter "${preferred}" is unavailable: ${status.reason ?? "unknown reason"}`,
-        );
-      }
+      // Explicit preference unavailable: report and stop.
+      throw new BridgeError(
+        "ADAPTER_NOT_AVAILABLE",
+        `preferred cursor adapter "${preferred}" is unavailable: ${status.reason ?? "unknown reason"}`,
+      );
     }
   }
   throw new BridgeError("ADAPTER_NOT_AVAILABLE", "no Cursor adapter available (tried sdk, acp, cli-fallback)", {
