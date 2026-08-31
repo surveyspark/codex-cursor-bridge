@@ -35,11 +35,10 @@ jobs:
       - name: Demos (fake agents)
         shell: bash
         run: |
-          git init .
           git config user.name ci
           git config user.email ci@example.invalid
-          git add -A
-          git commit -qm ci
+          git add -A || true
+          git commit -qm ci || echo "nothing to commit (ok)"
           mkdir -p .handoff
           node bundles/codex-cursor-bridge.mjs demos run delegate-investigate
           node bundles/codex-cursor-bridge.mjs demos run plan-and-execute
