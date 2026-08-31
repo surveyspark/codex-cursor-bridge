@@ -40,44 +40,85 @@ async function codexE2E() {
   const { mkdtemp } = await import("node:fs/promises");
   const os = await import("node:os");
   const dir = await mkdtemp(path.join(os.tmpdir(), "ccb-e2e-codex-"));
-  fs.writeFileSync(path.join(dir, "README.md"), "# e2e sandbox repo\n", { mode: 0o644 });
+  fs.writeFileSync(path.join(dir, "README.md"), "# e2e sandbox repo\n", {
+    mode: 0o644,
+  });
   try {
     await execFileAsync("git", ["init", "-q"], { cwd: dir });
     await execFileAsync("git", ["add", "-A"], { cwd: dir });
-    await execFileAsync("git", ["commit", "-qm", "init"], { cwd: dir, env: { ...process.env, GIT_AUTHOR_NAME: "e2e", GIT_AUTHOR_EMAIL: "e2e@example.invalid", GIT_COMMITTER_NAME: "e2e", GIT_COMMITTER_EMAIL: "e2e@example.invalid" } });
+    await execFileAsync("git", ["commit", "-qm", "init"], {
+      cwd: dir,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: "e2e",
+        GIT_AUTHOR_EMAIL: "e2e@example.invalid",
+        GIT_COMMITTER_NAME: "e2e",
+        GIT_COMMITTER_EMAIL: "e2e@example.invalid",
+      },
+    });
   } catch {
     /* commit best effort */
   }
 
-  const out = await run([
-    "codex", "start",
-    "--task", "Reply with exactly the word BRIDGE-E2E-OK and nothing else.",
-    "--mode", "investigate",
-    "--json",
-  ], { cwd: dir, timeout: 8 * 60_000 });
-  check("codex e2e: start returns JSON", out.includes('"status"'), out.slice(0, 200));
+  const out = await run(
+    [
+      "codex",
+      "start",
+      "--task",
+      "Reply with exactly the word BRIDGE-E2E-OK and nothing else.",
+      "--mode",
+      "investigate",
+      "--json",
+    ],
+    { cwd: dir, timeout: 8 * 60_000 },
+  );
+  check(
+    "codex e2e: start returns JSON",
+    out.includes('"status"'),
+    out.slice(0, 200),
+  );
   check("codex e2e: completed", out.includes('"completed"'), out.slice(0, 300));
-  check("codex e2e: native thread id captured", /"(thr_|[0-9a-f]{8}-[0-9a-f]{4})/.test(out) || /nativeId/.test(out), out.slice(0, 300));
+  check(
+    "codex e2e: native thread id captured",
+    /"(thr_|[0-9a-f]{8}-[0-9a-f]{4})/.test(out) || /nativeId/.test(out),
+    out.slice(0, 300),
+  );
 }
 
 async function cursorE2E() {
   const os = await import("node:os");
   const { mkdtemp } = await import("node:fs/promises");
   const dir = await mkdtemp(path.join(os.tmpdir(), "ccb-e2e-cursor-"));
-  fs.writeFileSync(path.join(dir, "README.md"), "# e2e sandbox repo\n", { mode: 0o644 });
+  fs.writeFileSync(path.join(dir, "README.md"), "# e2e sandbox repo\n", {
+    mode: 0o644,
+  });
   try {
     await execFileAsync("git", ["init", "-q"], { cwd: dir });
   } catch {
     /* best effort */
   }
-  const out = await run([
-    "cursor", "start",
-    "--task", "Reply with exactly the word BRIDGE-E2E-OK and nothing else. Do not modify files.",
-    "--mode", "investigate",
-    "--json",
-  ], { cwd: dir, timeout: 8 * 60_000 });
-  check("cursor e2e: start returns JSON", out.includes('"status"'), out.slice(0, 200));
-  check("cursor e2e: completed", out.includes('"completed"'), out.slice(0, 300));
+  const out = await run(
+    [
+      "cursor",
+      "start",
+      "--task",
+      "Reply with exactly the word BRIDGE-E2E-OK and nothing else. Do not modify files.",
+      "--mode",
+      "investigate",
+      "--json",
+    ],
+    { cwd: dir, timeout: 8 * 60_000 },
+  );
+  check(
+    "cursor e2e: start returns JSON",
+    out.includes('"status"'),
+    out.slice(0, 200),
+  );
+  check(
+    "cursor e2e: completed",
+    out.includes('"completed"'),
+    out.slice(0, 300),
+  );
 }
 
 async function main() {
@@ -106,7 +147,9 @@ async function main() {
   for (const f of results.fail) console.error(`  FAIL ${f}`);
   process.exitCode = results.fail.length > 0 ? 1 : 0;
   if (results.skipped.length > 0) {
-    console.log("\ncredential-dependent tests were SKIPPED (not run, not counted as passing).");
+    console.log(
+      "\ncredential-dependent tests were SKIPPED (not run, not counted as passing).",
+    );
   }
 }
 
