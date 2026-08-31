@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-01
+
+### Fixed
+
+- Cursor CLI resolution now prefers the official `agent` binary
+  (cursor.com/install); the npm `cursor-agent` package is third-party and is
+  only accepted as a legacy alias. Docs, doctor remediations, and plugin
+  READMEs corrected.
+- ACP permission denial now matches the documented option kinds
+  (`reject_once`/`reject_always`) per the Agent Client Protocol spec.
+
+### Documented
+
+- Full Cursor integration research notes (skills directories and frontmatter
+  fields incl. `paths`/`disable-model-invocation`, hooks events and matchers,
+  MCP config interpolation and deeplinks, CLI parameter reference, `@cursor/sdk`
+  API surface and REST endpoints, ACP protocol v1 details) filed from official
+  sources; recorded in docs/compatibility.md.
+
 ## [0.1.0] - 2026-08-31
 
 ### Added
