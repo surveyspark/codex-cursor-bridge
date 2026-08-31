@@ -97,8 +97,10 @@ export async function runDemos(args: string[], ctx: { repoRoot: string; json?: b
 /* ---------------- fake processes ---------------- */
 
 /** Fake codex app-server: minimal protocol-conformant script. */
-function fakeCodexAppServerScript(): string {
+function fakeCodexAppServerScript(options?: { turnDelayMs?: number }): string {
+  const delay = options?.turnDelayMs ?? 0;
   return `
+const TURN_DELAY_MS = ${delay};
 const readline = require("readline");
 const rl = readline.createInterface({ input: process.stdin });
 function send(o){ process.stdout.write(JSON.stringify(o) + "\\n"); }
@@ -115,10 +117,13 @@ rl.on("line", (line) => {
   } else if (msg.method === "turn/start") {
     const p = msg.params || {};
     send({ jsonrpc: "2.0", method: "turn/started", params: { threadId: p.threadId, turn: { id: "turn-1", items: [], status: "inProgress" } } });
+    const emitItems = () => {
     send({ jsonrpc: "2.0", method: "item/completed", params: { threadId: p.threadId, turnId: "turn-1", completedAtMs: Date.now(), item: { id: "i1", type: "commandExecution", command: "grep -rn TODO . | head -5", exitCode: 0, aggregatedOutput: "found 5 TODOs", cwd: process.cwd(), status: "completed", commandActions: [] } } });
     send({ jsonrpc: "2.0", method: "item/completed", params: { threadId: p.threadId, turnId: "turn-1", completedAtMs: Date.now(), item: { id: "i2", type: "agentMessage", text: "Investigation complete. ## Bridge summary\\nFound the root cause in src/index.ts." } } });
     send({ jsonrpc: "2.0", method: "turn/completed", params: { threadId: p.threadId, turn: { id: "turn-1", items: [], status: "completed" } } });
     send({ jsonrpc: "2.0", id: msg.id, result: { turnId: "turn-1" } });
+    };
+    if (TURN_DELAY_MS > 0) setTimeout(emitItems, TURN_DELAY_MS); else emitItems();
   } else if (msg.method === "turn/interrupt") {
     send({ jsonrpc: "2.0", id: msg.id, result: {} });
   } else if (msg.id !== undefined) {
@@ -166,7 +171,12 @@ async function materializeFake(dir: string, name: string, script: string): Promi
   return file;
 }
 
-function managerWithFakes(repoRoot: string, scratch: string, log: ReturnType<typeof createLogger>): Promise<JobManager> {
+function managerWithFakes(
+  repoRoot: string,
+  scratch: string,
+  log: ReturnType<typeof createLogger>,
+  overrides?: { codex?: InstanceType<typeof CodexAppServerAdapter> },
+): Promise<JobManager> {
   const fakeCodexP = materializeFake(scratch, "fake-codex-app-server.cjs", fakeCodexAppServerScript());
   const fakeAcpP = materializeFake(scratch, "fake-cursor-acp.cjs", fakeCursorAcpScript());
   return Promise.all([fakeCodexP, fakeAcpP]).then(([fakeCodex, fakeAcp]) => {
@@ -176,6 +186,7 @@ function managerWithFakes(repoRoot: string, scratch: string, log: ReturnType<typ
       logger: log,
       selectAdapter: async (_request, record) => {
         if (record.targetHost === "codex") {
+          if (overrides?.codex) return { adapter: overrides.codex, reason: "fake app-server (override) for demo" };
           return {
             adapter: new CodexAppServerAdapter({
               argvOverride: [process.execPath, fakeCodex],
@@ -274,14 +285,22 @@ async function demo3(scratch: string, ctx: { repoRoot: string }, _log: ReturnTyp
     void err;
   }
   const summary = await collectWorktreeDiff(wt, ctx.repoRoot, 1_000_000);
-  const originalDirty = (await inspectGit(ctx.repoRoot)).dirty;
+  // The original tree is untouched when no tracked files changed there.
+  // (.handoff/ artifacts are gitignored and don't count.)
+  const { execFile: _execFile } = await import("node:child_process");
+  const { promisify: _promisify } = await import("node:util");
+  const _run = _promisify(_execFile);
+  const status = await _run("git", ["status", "--porcelain"], { cwd: ctx.repoRoot, timeout: 15_000 });
+  const trackedDirty = status.stdout
+    .split("\n")
+    .some((l) => l.trim().length > 0 && !l.includes(".handoff/"));
   report("demo3 worktree-isolation", {
     worktree: wt.path,
     branch: wt.branch,
     baseRef: wt.baseRef,
     filesChanged: summary.filesChanged,
     patch: summary.patchPath,
-    originalTreeUntouched: !originalDirty,
+    originalTreeUntouched: !trackedDirty,
   });
   // Cleanup only on explicit demo completion.
   await removeWorktree(ctx.repoRoot, wt.path).catch(() => {});
@@ -314,9 +333,12 @@ async function demo4(scratch: string, ctx: { repoRoot: string }, log: ReturnType
 
 async function demo5(scratch: string, ctx: { repoRoot: string }, _log: ReturnType<typeof createLogger>): Promise<void> {
   // Spawn a long-lived fake app-server mid-turn and cancel it; assert the
-  // process tree dies and the job records a cancelled result. For the cancel
-  // demo we use the REAL slow-fake via a delayed thread/start response.
-  const manager = await managerWithFakes(ctx.repoRoot, scratch, _log);
+  // process tree dies and the job records a cancelled result. The cancel
+  // demo uses a delayed fake whose turn never finishes before cancellation.
+  const fakeSlow = await materializeFake(scratch, "fake-codex-slow.cjs", fakeCodexAppServerScript({ turnDelayMs: 30_000 }));
+  const manager = await managerWithFakes(ctx.repoRoot, scratch, _log, {
+    codex: new CodexAppServerAdapter({ argvOverride: [process.execPath, fakeSlow], extraEnv: {} }),
+  });
   const request: StartRequest = {
     task: "Long investigation that will be cancelled.",
     cwd: ctx.repoRoot,

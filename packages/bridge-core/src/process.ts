@@ -149,10 +149,15 @@ export function spawnProcess(opts: SpawnOptions): SpawnHandle {
   wireLineSplitter(child.stdout, false);
   wireLineSplitter(child.stderr, true);
 
+  child.stdin?.on("error", () => {
+    // EPIPE when the child exits early; stdout/stderr handling reports it.
+  });
+  // Keep stdin open until the caller ends it explicitly; ending immediately
+  // breaks long-lived protocol children that read stdin lazily.
   if (opts.stdinData !== undefined) {
     child.stdin?.write(opts.stdinData);
+    child.stdin?.end();
   }
-  child.stdin?.end();
 
   const abort = (): void => {
     timedOut = true;

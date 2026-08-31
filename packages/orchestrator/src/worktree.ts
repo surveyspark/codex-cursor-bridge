@@ -177,13 +177,17 @@ export async function collectWorktreeDiff(
       maxBuffer: 8 * 1024 * 1024,
     });
     const files: WorktreeDiffSummary["files"] = [];
+    // Primary source: numstat vs base ref (works for committed AND uncommitted changes).
+    for (const line of numstat.stdout.split("\n")) {
+      const m = /^(\d+|-)\t(\d+|-)\t(.+)$/.exec(line);
+      if (!m) continue;
+      files.push({ path: m[3]!.trim(), change: "modified" });
+    }
+    // Plus untracked files (not in numstat).
     for (const line of status.stdout.split("\n")) {
-      if (line.trim().length < 4) continue;
-      const code = line.slice(0, 2).trim();
-      const file = line.slice(3).trim().replace(/^"|"$/g, "");
-      const change: WorktreeDiffSummary["files"][number]["change"] =
-        code === "??" || code === "A" ? "added" : code === "D" ? "deleted" : code === "R" ? "renamed" : "modified";
-      files.push({ path: file, change });
+      if (!line.startsWith("??")) continue;
+      const file = line.slice(3).trim().replace(/^"|"$/, "");
+      if (file && !files.some((f) => f.path === file)) files.push({ path: file, change: "added" });
     }
     let insertions = 0;
     let deletions = 0;

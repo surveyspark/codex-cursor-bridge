@@ -135,8 +135,8 @@ export function buildToolRouter(opts: RouterOptions): ToolDef[] {
       });
       const result = await manager.run(enq.jobId);
       return {
-        payload: { jobId: result.jobId, nativeId: result.nativeId, status: result.status, result: result.result },
-        summary: `${target} job ${result.jobId} finished with status ${result.status}${result.nativeId ? ` (native id ${result.nativeId})` : ""}. ${redactString((result.result?.summary ?? "").slice(0, 400))}`,
+        payload: { jobId: result.jobId, nativeId: result.nativeId, status: result.status, result },
+        summary: `${target} job ${result.jobId} finished with status ${result.status}${result.nativeId ? ` (native id ${result.nativeId})` : ""}. ${redactString(result.summary.slice(0, 400))}`,
       };
     },
   });

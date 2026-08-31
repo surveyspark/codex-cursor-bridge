@@ -26,12 +26,20 @@ export class JsonLineReader {
   }
 
   push(chunk: string): void {
+    // Accept both raw stream chunks and pre-split lines: a trailing newline
+    // is optional, so single lines passed by line-splitters dispatch too.
     this.pending += chunk;
     let idx: number;
     while ((idx = this.pending.indexOf("\n")) >= 0) {
       const raw = this.pending.slice(0, idx).trim();
       this.pending = this.pending.slice(idx + 1);
       if (raw.length === 0) continue;
+      this.dispatch(raw);
+    }
+    // No trailing newline: dispatch what we have (line-oriented transports).
+    if (this.pending.trim().length > 0) {
+      const raw = this.pending.trim();
+      this.pending = "";
       this.dispatch(raw);
     }
     if (this.pending.length > this.maxBytes) {
@@ -173,7 +181,12 @@ export class JsonRpcConnection {
 
   private sendRaw(obj: unknown): void {
     if (this.closed) return;
-    this.opts.send(JSON.stringify(obj));
+    try {
+      this.opts.send(JSON.stringify(obj));
+    } catch {
+      // Transport died mid-write; waitExit/exit handling reports it.
+      this.closed = true;
+    }
   }
 
   notify(method: string, params?: unknown): void {
@@ -204,8 +217,9 @@ export class JsonRpcConnection {
     });
   }
 
-  /** Reject all pending requests and stop sending. */
+  /** Reject all pending requests and stop sending. Idempotent. */
   close(): void {
+    if (this.closed) return;
     this.closed = true;
     for (const [id, entry] of this.pending) {
       if (entry.timer) clearTimeout(entry.timer);

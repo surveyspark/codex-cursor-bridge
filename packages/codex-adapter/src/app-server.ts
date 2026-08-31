@@ -201,7 +201,11 @@ export class CodexAppServerAdapter implements AgentAdapter {
 
     const rpc = new JsonRpcConnection({
       send: (line) => {
-        child.child.stdin?.write(line + "\n");
+        if (child.child.stdin?.writable) {
+          child.child.stdin.write(line + "\n");
+        } else {
+          throw new Error("codex app-server stdin closed");
+        }
       },
       onNotification: (msg) => {
         const params = (msg.params ?? {}) as Record<string, unknown>;
