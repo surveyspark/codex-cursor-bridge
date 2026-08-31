@@ -351,10 +351,19 @@ export class CodexAppServerAdapter implements AgentAdapter {
         // send these, but if it does we deny safely.
         const params = (msg.params ?? {}) as Record<string, unknown>;
         const kind = msg.method;
+        // Current protocol (0.145+): item/commandExecution/requestApproval and
+        // item/fileChange/requestApproval. Legacy aliases execCommandApproval /
+        // applyPatchApproval are handled for forward compatibility.
         const summary =
-          kind === "execCommandApproval"
-            ? `exec: ${String((params as { command?: unknown }).command ?? params.command ?? "unknown command")}`
-            : kind === "applyPatchApproval"
+          kind === "execCommandApproval" ||
+          kind === "item/commandExecution/requestApproval"
+            ? `exec: ${String(
+                (params as { command?: unknown }).command ??
+                  params.command ??
+                  "unknown command",
+              )}`
+            : kind === "applyPatchApproval" ||
+                kind === "item/fileChange/requestApproval"
               ? "apply patch"
               : `codex server request: ${kind}`;
         ctx.emit({

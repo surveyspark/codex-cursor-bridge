@@ -18,6 +18,9 @@ Primary sources, in order of authority:
 4. **Official repositories**: `openai/codex-plugin-cc` (Apache-2.0, inspected
    for architecture only — no source reused), local OpenAI Codex plugin
    manifests (`.codex-plugin/plugin.json`) as schema reference.
+5. **Full research reports** (fact-by-fact, source-tied): appended in this
+   directory as [research-codex-2026-08-30.md](research-codex-2026-08-30.md)
+   and [research-cursor-2026-08-30.md](research-cursor-2026-08-30.md).
 
 Consulted pages/repos (accessed 2026-08-30/31):
 
