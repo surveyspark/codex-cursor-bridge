@@ -1,6 +1,6 @@
 {
   "name": "codex-cursor-bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Delegate difficult work from Cursor to Codex: investigation, adversarial review, rescue, planning, and isolated implementation with background job tracking. Independent interoperability plugin; not affiliated with OpenAI or Cursor.",
   "author": {
     "name": "codex-cursor-bridge contributors"

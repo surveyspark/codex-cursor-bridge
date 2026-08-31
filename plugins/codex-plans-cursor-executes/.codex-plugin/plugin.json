@@ -1,6 +1,6 @@
 {
   "name": "codex-cursor-bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Plan in Codex, execute in Cursor: validated handoff plans, background execution jobs with permission profiles, and diff review. Independent interoperability plugin; not affiliated with OpenAI or Cursor.",
   "author": {
     "name": "codex-cursor-bridge contributors"

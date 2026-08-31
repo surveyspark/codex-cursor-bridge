@@ -6,7 +6,7 @@
  * Schemas in `schemas/` and are validated at runtime by `bridge-core/schemas`.
  */
 
-export const BRIDGE_VERSION = "0.1.0" as const;
+export const BRIDGE_VERSION = "0.1.1" as const;
 
 export type Host = "cursor" | "codex";
 export type OriginHost = Host | "cli";

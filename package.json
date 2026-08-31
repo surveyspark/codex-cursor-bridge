@@ -1,6 +1,6 @@
 {
   "name": "codex-cursor-bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Local-first, two-way delegation bridge between Codex and Cursor agents. Not affiliated with or endorsed by OpenAI or Cursor.",
   "license": "Apache-2.0",
