@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -164,6 +165,10 @@ describe("security: path containment", () => {
     // job cwd stays inside. Sanity-check canonicalize is symlink-aware.
     const { root: repo, cleanup } = await makeTempRepo({});
     cleanups.push(cleanup);
+    if (process.platform === "win32") {
+      // POSIX-specific check: Windows has no /etc and symlinks need privileges.
+      return;
+    }
     const link = path.join(repo, "link-outside");
     try {
       fs.symlinkSync("/etc", link);
@@ -208,11 +213,9 @@ describe("security: environment allowlisting", () => {
 describe("security: no listening ports by default", () => {
   it("MCP server runs stdio-only (no net server imported in serve path)", async () => {
     // Static guard: the MCP server source must not open listening sockets.
+    const here = path.dirname(fileURLToPath(import.meta.url));
     const src = fs.readFileSync(
-      path.join(
-        path.dirname(new URL(import.meta.url).pathname),
-        "../../packages/mcp-server/src/serve.ts",
-      ),
+      path.join(here, "../../packages/mcp-server/src/serve.ts"),
       "utf8",
     );
     expect(src).not.toMatch(/\.listen\s*\(/);

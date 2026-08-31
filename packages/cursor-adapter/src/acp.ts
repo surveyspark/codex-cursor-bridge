@@ -290,7 +290,11 @@ export class CursorAcpAdapter implements AgentAdapter {
       };
     }
 
-    if (exit.code !== 0 && exit.code !== null) {
+    // A non-zero exit only matters when the prompt never completed: after a
+    // finished turn the bridge terminates the transport itself (taskkill /F
+    // on Windows yields exit code 1), which is expected, not a failure.
+    const promptCompleted = promptResult !== null;
+    if (!promptCompleted && exit.code !== 0 && exit.code !== null) {
       return {
         jobId: ctx.jobId,
         nativeId: activeSession,
