@@ -13,7 +13,8 @@ This plugin packages:
 
 - Node.js >= 20.19
 - One Cursor transport: `@cursor/sdk` + `CURSOR_API_KEY`, or the Cursor CLI
-  (`npm i -g cursor-agent`, logged in via `cursor-agent login`)
+  (official CLI via `curl https://cursor.com/install -fsS | bash`; binary
+  `agent`, logged in via `agent login` — no npm package exists)
 - The bridge CLI on PATH (`codex-cursor-bridge`)
 
 ## Install (release archive)

@@ -62,6 +62,12 @@ export {
 } from "./paths.js";
 
 export { spawnProcess, buildChildEnv, isPidAlive } from "./process.js";
+export {
+  resolveCursorCliName,
+  resetCursorCliCache,
+  CURSOR_CLI_INSTALL_HINT,
+} from "./cursor-cli.js";
+export type { CursorCliName } from "./cursor-cli.js";
 export type { SpawnOptions, SpawnOutcome, SpawnHandle } from "./process.js";
 
 export {

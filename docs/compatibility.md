@@ -59,7 +59,7 @@ Consulted pages/repos (accessed 2026-08-30/31):
 | Feature                   | Requires                                                                                    |
 | ------------------------- | ------------------------------------------------------------------------------------------- |
 | Cursor → Codex delegation | Codex login (`codex login` or `OPENAI_API_KEY` via `codex login --with-api-key`)            |
-| Codex → Cursor via ACP    | Cursor CLI installed + `cursor-agent login` (existing local Cursor auth)                    |
+| Codex → Cursor via ACP    | Official Cursor CLI installed (binary `agent`) + `agent login` (existing local Cursor auth) |
 | Codex → Cursor via SDK    | `@cursor/sdk` installed + `CURSOR_API_KEY` (Cursor cloud agents; billing per Cursor's docs) |
 | Cursor `--print` fallback | Cursor CLI + explicit `allowNonInteractiveCliFallback: true`                                |
 
@@ -81,6 +81,13 @@ bridge; the underlying CLIs/SDKs consume them from the environment.
   attaching to an existing agent; the adapter fails with
   `ADAPTER_UNSUPPORTED_CAPABILITY` (and selection falls back to ACP) when it
   does not.
+
+**Cursor CLI naming correction (2026-08-31):** earlier revisions of this
+project said `npm i -g cursor-agent`. That package is third-party and
+unrelated to Cursor/Anysphere. The official CLI ships via the installer
+script only, with binary name `agent`; the bridge resolves `agent` first and
+accepts `cursor-agent` only as a legacy alias. Verified against
+cursor.com/docs/cli/installation and the npm registry.
 
 Honest limitation: we do **not** claim that native Codex threads or Cursor
 sessions appear in any specific desktop/editor history UI. Resume is provided

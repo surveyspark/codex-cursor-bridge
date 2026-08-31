@@ -35,8 +35,11 @@ Default timeout is 30 min (`defaultTimeoutMs`). `codex status <jobId>` shows
 
 ### `ADAPTER_NOT_AVAILABLE` on Codex→Cursor jobs
 
-- No transport available. Best path: `npm i -g cursor-agent && cursor-agent login`
-  (ACP uses your existing Cursor login).
+- No transport available. Best path: install the official Cursor CLI —
+  `curl https://cursor.com/install -fsS | bash` (Windows:
+  `irm 'https://cursor.com/install?win32=true' | iex`) — then `agent login`
+  (ACP uses your existing Cursor login). The binary is `agent`; there is no
+  official npm package for it.
 - SDK path: `npm i -g @cursor/sdk` + set `CURSOR_API_KEY` (cloud agents;
   billing per Cursor docs).
 - `cursor.cli-fallback` exists but is gated; enable

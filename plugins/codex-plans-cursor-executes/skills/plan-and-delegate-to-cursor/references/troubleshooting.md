@@ -19,7 +19,9 @@ is available and which would be selected.
 
 ### `ADAPTER_NOT_AVAILABLE` on `cursor_start`
 
-- No `cursor-agent`: `npm i -g cursor-agent`, then `cursor-agent login`.
+- No Cursor CLI: install the official one — `curl https://cursor.com/install
+-fsS | bash` — then `agent login`. The binary is `agent`; `cursor-agent` on
+  npm is an unrelated third-party package.
 - ACP probe fails: run `cursor-agent acp` manually; check login state.
 - SDK path: `npm i -g @cursor/sdk` and set `CURSOR_API_KEY` (billing applies
   per official Cursor docs; the bridge never prints the key).

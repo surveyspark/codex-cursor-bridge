@@ -16,6 +16,7 @@ import {
   defaultWorktreeRoot,
   loadConfig,
   redactedConfig,
+  resolveCursorCliName,
   type BridgeConfig,
 } from "@codex-cursor-bridge/bridge-core";
 import { JobStore } from "@codex-cursor-bridge/job-store";
@@ -229,14 +230,14 @@ export async function runDoctor(opts: {
   const acpStatus = await acp.isAvailable();
   add({
     id: "cursor.cli",
-    label: "Cursor CLI (cursor-agent)",
+    label: "Cursor CLI (agent)",
     status: acpStatus.available ? "pass" : "info",
     detail: acpStatus.available
-      ? `cursor-agent ${acpStatus.version}`
+      ? `agent (Cursor CLI) ${acpStatus.version}`
       : (acpStatus.reason ?? "not found"),
     remediation: acpStatus.available
       ? undefined
-      : "optional: npm i -g cursor-agent, then `cursor-agent login`",
+      : "optional: install the official CLI (curl https://cursor.com/install -fsS | bash), then `agent login`",
   });
   if (acpStatus.available) {
     const probe = await probeAcp();
@@ -247,7 +248,7 @@ export async function runDoctor(opts: {
       detail: probe.detail,
       remediation: probe.ok
         ? undefined
-        : "run `cursor-agent acp` manually; check `cursor-agent login`",
+        : "run `agent acp` manually; check `agent login`",
     });
   }
   const cliFallback = new CursorCliFallbackAdapter({
@@ -395,10 +396,10 @@ export async function runDoctor(opts: {
 }
 
 async function probeAcp(): Promise<{ ok: boolean; detail: string }> {
+  const bin = process.env.CCB_CURSOR_BINARY ?? (await resolveCursorCliName());
   return new Promise((resolve) => {
     let child: ReturnType<typeof execFile>;
     try {
-      const bin = process.env.CCB_CURSOR_BINARY ?? "cursor-agent";
       child = execFile(bin, ["acp"], { timeout: 15_000 }, () => {});
     } catch (err) {
       resolve({ ok: false, detail: `spawn failed: ${(err as Error).message}` });

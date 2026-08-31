@@ -21,6 +21,7 @@ import {
   JsonRpcConnection,
   buildChildEnv,
   redactString,
+  resolveCursorCliName,
   spawnProcess,
   type JobResult,
   type StartRequest,
@@ -51,23 +52,36 @@ export class CursorAcpAdapter implements AgentAdapter {
 
   constructor(private readonly opts: CursorAcpAdapterOptions = {}) {}
 
+  private binaryName = "agent";
+  private resolved = false;
+
+  /**
+   * Official Cursor CLI binary is `agent` (installed via cursor.com/install —
+   * there is NO official npm package). `cursor-agent` is accepted as a legacy
+   * alias; explicit config (cursorBinaryPath / CCB_CURSOR_BINARY) always wins.
+   */
+  private async ensureBinary(): Promise<void> {
+    if (this.resolved) return;
+    if (this.opts.cursorBinaryPath) {
+      this.binaryName = this.opts.cursorBinaryPath;
+    } else if (process.env.CCB_CURSOR_BINARY) {
+      this.binaryName = process.env.CCB_CURSOR_BINARY;
+    } else {
+      this.binaryName = await resolveCursorCliName();
+    }
+    this.resolved = true;
+  }
+
   private argvBase(): string[] {
     if (this.opts.argvOverride) return this.opts.argvOverride;
-    const bin =
-      this.opts.cursorBinaryPath ??
-      process.env.CCB_CURSOR_BINARY ??
-      "cursor-agent";
-    return [bin, "acp"];
+    return [this.binaryName, "acp"];
   }
 
   async cursorCliVersion(): Promise<string | null> {
     if (this.opts.argvOverride) return "test-fake";
-    const bin =
-      this.opts.cursorBinaryPath ??
-      process.env.CCB_CURSOR_BINARY ??
-      "cursor-agent";
+    await this.ensureBinary();
     try {
-      const { stdout } = await execFileAsync(bin, ["--version"], {
+      const { stdout } = await execFileAsync(this.binaryName, ["--version"], {
         timeout: 10_000,
       });
       return stdout.trim();
@@ -84,7 +98,7 @@ export class CursorAcpAdapter implements AgentAdapter {
       return {
         available: false,
         reason:
-          "cursor-agent CLI not found on PATH (install: npm i -g cursor-agent)",
+          "Cursor CLI not found on PATH (install: curl https://cursor.com/install -fsS | bash)",
       };
     }
     return { available: true, version };
@@ -113,6 +127,7 @@ export class CursorAcpAdapter implements AgentAdapter {
   }
 
   async run(request: StartRequest, ctx: AdapterRunContext): Promise<JobResult> {
+    await this.ensureBinary();
     // One connection per prompt keeps abort handling in a single place:
     // session/new happens here, then promptAndCollect runs the prompt on a
     // fresh connection with session/load continuation.
@@ -134,6 +149,7 @@ export class CursorAcpAdapter implements AgentAdapter {
     request: StartRequest;
   }): Promise<JobResult> {
     const { sessionId, prompt, ctx } = args;
+    await this.ensureBinary();
     const startedAt = new Date().toISOString();
     const child = spawnProcess({
       cwd: ctx.cwd,

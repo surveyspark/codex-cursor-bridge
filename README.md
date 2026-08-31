@@ -72,8 +72,10 @@ Full threat model: [docs/security-model.md](docs/security-model.md).
 - For Cursor→Codex: the Codex CLI, installed and logged in
   (`npm i -g @openai/codex && codex login`)
 - For Codex→Cursor, one of:
-  - Cursor CLI + login: `npm i -g cursor-agent && cursor-agent login` (ACP;
-    recommended, uses your existing Cursor auth), or
+  - Cursor CLI + login (ACP; recommended, uses your existing Cursor auth).
+    The official CLI is **not on npm** — install it with
+    `curl https://cursor.com/install -fsS | bash` (Windows:
+    `irm 'https://cursor.com/install?win32=true' | iex`), then `agent login`, or
   - `@cursor/sdk` + `CURSOR_API_KEY` (Cursor cloud agents; billing applies
     per Cursor's docs)
 - OS: macOS, Linux, or Windows
@@ -129,11 +131,11 @@ codex-cursor-bridge doctor
 
 ## Authentication
 
-| Who          | What                                                                               |
-| ------------ | ---------------------------------------------------------------------------------- |
-| Codex        | `codex login` (ChatGPT) or `printenv OPENAI_API_KEY \| codex login --with-api-key` |
-| Cursor (ACP) | `cursor-agent login` — uses your existing Cursor account                           |
-| Cursor (SDK) | `CURSOR_API_KEY` in the environment (never logged by the bridge)                   |
+| Who          | What                                                                                           |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| Codex        | `codex login` (ChatGPT) or `printenv OPENAI_API_KEY \| codex login --with-api-key`             |
+| Cursor (ACP) | `agent login` — official CLI binary is `agent` (not on npm); uses your existing Cursor account |
+| Cursor (SDK) | `CURSOR_API_KEY` in the environment (never logged by the bridge)                               |
 
 Check readiness without leaking values: `codex-cursor-bridge doctor`.
 

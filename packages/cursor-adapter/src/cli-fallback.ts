@@ -13,6 +13,7 @@
 
 import {
   buildChildEnv,
+  resolveCursorCliName,
   spawnProcess,
   type JobResult,
   type StartRequest,
@@ -49,13 +50,21 @@ export class CursorCliFallbackAdapter implements AgentAdapter {
 
   constructor(private readonly opts: CursorCliFallbackAdapterOptions) {}
 
-  private binary(): string {
-    if (this.opts.argvOverride) return this.opts.argvOverride[0]!;
-    return (
-      this.opts.cursorBinaryPath ??
-      process.env.CCB_CURSOR_BINARY ??
-      "cursor-agent"
-    );
+  private binaryName = "agent";
+  private resolved = false;
+
+  private async ensureBinary(): Promise<void> {
+    if (this.resolved) return;
+    if (this.opts.argvOverride) {
+      this.binaryName = this.opts.argvOverride[0]!;
+    } else if (this.opts.cursorBinaryPath) {
+      this.binaryName = this.opts.cursorBinaryPath;
+    } else if (process.env.CCB_CURSOR_BINARY) {
+      this.binaryName = process.env.CCB_CURSOR_BINARY;
+    } else {
+      this.binaryName = await resolveCursorCliName();
+    }
+    this.resolved = true;
   }
 
   private baseArgs(): string[] {
@@ -74,7 +83,7 @@ export class CursorCliFallbackAdapter implements AgentAdapter {
     if (this.opts.argvOverride)
       return { available: true, version: "test-fake" };
     try {
-      const { stdout } = await execFileAsync(this.binary(), ["--version"], {
+      const { stdout } = await execFileAsync(this.binaryName, ["--version"], {
         timeout: 10_000,
       });
       return { available: true, version: stdout.trim() };
@@ -109,8 +118,9 @@ export class CursorCliFallbackAdapter implements AgentAdapter {
     const startedAt = new Date().toISOString();
     const prompt = buildTaskPrompt(request, "cursor");
 
+    await this.ensureBinary();
     const argv = [
-      this.binary(),
+      this.binaryName,
       ...this.baseArgs(),
       "--print",
       "--output-format",
