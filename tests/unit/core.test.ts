@@ -185,6 +185,44 @@ describe("start request validation", () => {
     const r = validateStartRequest({ task: "a; rm -rf /", cwd: "/tmp" });
     expect(r.ok).toBe(true);
   });
+
+  it("rejects a relative cwd", () => {
+    const r = validateStartRequest({ task: "x", cwd: "not/absolute" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects write profiles on read-only modes", () => {
+    for (const mode of [
+      "investigate",
+      "review",
+      "adversarial-review",
+      "plan",
+      "rescue",
+    ] as const) {
+      for (const permissionProfile of [
+        "isolated-workspace-write",
+        "current-workspace-write",
+      ] as const) {
+        const r = validateStartRequest({
+          task: "x",
+          cwd: "/tmp",
+          mode,
+          permissionProfile,
+        });
+        expect(r.ok).toBe(false);
+      }
+    }
+  });
+
+  it("rejects implement + read-only", () => {
+    const r = validateStartRequest({
+      task: "x",
+      cwd: "/tmp",
+      mode: "implement",
+      permissionProfile: "read-only",
+    });
+    expect(r.ok).toBe(false);
+  });
 });
 
 describe("redaction", () => {

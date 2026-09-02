@@ -13,6 +13,8 @@
 import {
   BridgeError,
   asBridgeError,
+  assertInsideRepo,
+  assertNoSymlinkEscape,
   canonicalize,
   currentBootId,
   DEFAULT_CONFIG,
@@ -129,34 +131,49 @@ export class JobManager {
       targetHost?: TargetHost;
     },
   ): Promise<StartJobResult> {
+    const cwd = assertNoSymlinkEscape(
+      this.repoRoot,
+      assertInsideRepo(this.repoRoot, request.cwd, "cwd"),
+    );
+    const mode = request.mode ?? "investigate";
+    const permissionProfile =
+      request.permissionProfile ?? this.profileForMode(mode);
+    this.assertModeProfile(mode, permissionProfile);
+
+    const parentJobId =
+      request.origin?.parentJobId ?? process.env.CCB_PARENT_JOB_ID ?? undefined;
+    const parent = parentJobId ? this.store.tryGet(parentJobId) : null;
+    const derivedDepth = parent ? parent.handoffDepth + 1 : 0;
+    const envFloor = Number.parseInt(process.env.CCB_HANDOFF_DEPTH ?? "", 10);
+    const claimed = request.origin?.handoffDepth ?? 0;
+    const depth = Math.max(
+      derivedDepth,
+      Number.isFinite(envFloor) ? envFloor : 0,
+      claimed,
+    );
+    const maxDepth = Math.min(
+      this.config.maxHandoffDepth,
+      HARD_MAX_HANDOFF_DEPTH,
+    );
+
     const requestNorm: StartRequest = {
       ...request,
-      cwd: canonicalize(request.cwd),
-      mode: request.mode ?? "investigate",
-      permissionProfile:
-        request.permissionProfile ??
-        this.profileForMode(request.mode ?? "investigate"),
+      cwd,
+      mode,
+      permissionProfile,
       background: request.background ?? true,
       origin: {
         host: origin.host,
         ...(request.origin?.requestId
           ? { requestId: request.origin.requestId }
           : {}),
-        ...(request.origin?.parentJobId
-          ? { parentJobId: request.origin.parentJobId }
-          : {}),
-        handoffDepth: request.origin?.handoffDepth ?? 0,
-        maxHandoffDepth:
-          request.origin?.maxHandoffDepth ?? this.config.maxHandoffDepth,
+        ...(parentJobId ? { parentJobId } : {}),
+        handoffDepth: depth,
+        maxHandoffDepth: maxDepth,
       },
     };
 
     // Recursion control.
-    const depth = requestNorm.origin!.handoffDepth;
-    const maxDepth = Math.min(
-      requestNorm.origin!.maxHandoffDepth,
-      HARD_MAX_HANDOFF_DEPTH,
-    );
     const targetHost = this.resolveTarget(origin);
     if (depth > maxDepth) {
       throw new BridgeError(
@@ -308,9 +325,14 @@ export class JobManager {
         data: { adapter: adapter.name, reason },
       });
 
-      // Worktree isolation for writes.
+      // Worktree isolation for writes, and for Cursor read-only jobs so
+      // unenforced ACP/SDK writes cannot land on the developer's tree.
       let cwd = record.cwd;
-      if (request.permissionProfile === "isolated-workspace-write") {
+      const isolate =
+        request.permissionProfile === "isolated-workspace-write" ||
+        (request.permissionProfile === "read-only" &&
+          record.targetHost === "cursor");
+      if (isolate) {
         const wt = await createWorktree({
           repoRoot: this.repoRoot,
           worktreeRoot: this.config.worktreeRoot ?? defaultWorktreeRoot(),
@@ -352,6 +374,10 @@ export class JobManager {
         debugLogging: this.config.debugLogging,
         networkPolicy: this.config.networkPolicy,
         maxOutputBytes: this.config.maxOutputBytes,
+        handoffEnv: {
+          CCB_PARENT_JOB_ID: jobId,
+          CCB_HANDOFF_DEPTH: String(this.store.get(jobId).handoffDepth),
+        },
         emit: (event) => {
           this.store.appendEvent(jobId, event);
         },
@@ -418,11 +444,9 @@ export class JobManager {
     originalCwd: string,
   ): Promise<JobResult> {
     const record = this.store.get(jobId);
-    // Diff collection for write modes.
-    if (
-      result.status === "completed" &&
-      record.permissionProfile !== "read-only"
-    ) {
+    // Diff collection for write modes and for read-only jobs that used a
+    // disposable worktree (Cursor) so a dirty tree cannot report completed.
+    if (result.status === "completed") {
       try {
         if (record.worktree) {
           const summary = await collectWorktreeDiff(
@@ -443,7 +467,7 @@ export class JobManager {
               { path: summary.patchPath, kind: "patch" },
             ];
           }
-        } else {
+        } else if (record.permissionProfile !== "read-only") {
           const summary = await collectCurrentDiffSummary(
             originalCwd,
             null,
@@ -468,9 +492,16 @@ export class JobManager {
       record.permissionProfile === "read-only" &&
       (result.changedFiles?.length ?? 0) > 0
     ) {
+      result.status = "failed";
+      result.failure = {
+        code: "PERMISSION_DENIED",
+        message:
+          "read-only job modified files; writes were isolated to a disposable worktree and the job is failed",
+        retriable: false,
+      };
       result.warnings = [
         ...(result.warnings ?? []),
-        "read-only job reported changed files; verify unexpected modifications before continuing",
+        "read-only job reported changed files",
       ];
     }
 
@@ -700,6 +731,31 @@ export class JobManager {
       "BRIDGE_USAGE",
       `cannot infer target host from origin "${origin.host}"; pass origin.targetHost`,
     );
+  }
+
+  private assertModeProfile(
+    mode: StartRequest["mode"],
+    profile: StartRequest["permissionProfile"],
+  ): void {
+    const readOnlyModes = new Set([
+      "investigate",
+      "review",
+      "adversarial-review",
+      "rescue",
+      "plan",
+    ]);
+    if (readOnlyModes.has(mode) && profile !== "read-only") {
+      throw new BridgeError(
+        "BRIDGE_USAGE",
+        `${mode} is read-only and cannot use ${profile}`,
+      );
+    }
+    if (mode === "implement" && profile === "read-only") {
+      throw new BridgeError(
+        "BRIDGE_USAGE",
+        "implement requires a write profile",
+      );
+    }
   }
 
   private profileForMode(

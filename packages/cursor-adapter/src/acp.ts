@@ -154,7 +154,7 @@ export class CursorAcpAdapter implements AgentAdapter {
     const child = spawnProcess({
       cwd: ctx.cwd,
       argv: this.argvBase(),
-      env: buildChildEnv(["CURSOR_API_KEY"]),
+      env: buildChildEnv(["CURSOR_API_KEY"], ctx.handoffEnv),
       onStdoutLine: (line) => reader.pushLine(line),
       onStderrLine: (line) =>
         ctx.emit({
@@ -188,8 +188,18 @@ export class CursorAcpAdapter implements AgentAdapter {
           const options =
             (params.options as Array<{ kind?: string; optionId?: string }>) ??
             [];
-          const denyOption =
-            options.find((o) => o.kind === "reject_once") ?? options.at(-1);
+          const deny =
+            options.find(
+              (o) => o.kind === "reject_once" || o.kind === "reject-once",
+            ) ??
+            options.find(
+              (o) => o.kind === "reject_always" || o.kind === "reject-always",
+            ) ??
+            options.find(
+              (o) =>
+                typeof o.kind === "string" &&
+                (o.kind.startsWith("reject") || o.kind.startsWith("deny")),
+            );
           ctx.approval({
             ts: new Date().toISOString(),
             kind: "session/request_permission",
@@ -197,16 +207,31 @@ export class CursorAcpAdapter implements AgentAdapter {
               JSON.stringify(params.options ?? {}).slice(0, 500),
             ),
             decision: "auto-denied",
-            reason: "bridge policy: permission escalations are denied",
+            reason: deny?.optionId
+              ? `denied via ${deny.kind ?? "reject"} (${deny.optionId})`
+              : "no reject option; cancelled",
           });
+          if (!deny?.optionId) {
+            return { outcome: { outcome: "cancelled" } };
+          }
           return {
             outcome: {
               outcome: "selected",
-              optionId: denyOption?.optionId ?? null,
+              optionId: deny.optionId,
             },
           };
         }
-        return {};
+        ctx.approval({
+          ts: new Date().toISOString(),
+          kind: msg.method,
+          summary: "unrecognised ACP server request denied",
+          decision: "auto-denied",
+          reason: `unrecognised method ${msg.method}`,
+        });
+        throw new BridgeError(
+          "PERMISSION_DENIED",
+          `unrecognised ACP request ${msg.method}`,
+        );
       },
       onClose: () => rpc.close(),
     });

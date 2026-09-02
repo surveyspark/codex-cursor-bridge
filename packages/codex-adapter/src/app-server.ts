@@ -223,7 +223,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
             "NO_PROXY",
           ]),
         ],
-        this.opts.extraEnv,
+        { ...this.opts.extraEnv, ...ctx.handoffEnv },
       ),
       onStdoutLine: (line) => reader.pushLine(line),
       onStderrLine: (line) => {

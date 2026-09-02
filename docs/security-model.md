@@ -77,8 +77,9 @@ not directives.
 
 ### 7. Agent recursion
 
-- Every delegation carries `handoffDepth`/`maxHandoffDepth`; enqueue rejects
-  depth > cap (default 1, hard max 2) with `RECURSION_BLOCKED`.
+- Depth is derived from `parentJobId` (and `CCB_PARENT_JOB_ID` /
+  `CCB_HANDOFF_DEPTH` in child env), not from a caller-supplied counter.
+  Enqueue rejects depth > cap (default 1, hard max 2) with `RECURSION_BLOCKED`.
 - Prompts forbid delegating back to the originating host; MCP tool routers
   expose only opposite-host tools, so a Cursor session literally cannot call
   `cursor_start` on the bridge, and a Codex session cannot call `codex_start`.
@@ -87,7 +88,10 @@ not directives.
 ### 8. Uncontrolled network access
 
 - Codex sandbox policy sets `networkAccess: false` (read-only and
-  workspace-write) unless the user overrides `networkPolicy`.
+  workspace-write) unless the user overrides `networkPolicy`. The
+  `codex exec` fallback passes
+  `-c sandbox_workspace_write.network_access=<bool>` so the same policy
+  applies on both transports.
 - The bridge itself opens no sockets: MCP transport is stdio-only, there is no
   telemetry, and no update/check calls.
 

@@ -198,16 +198,16 @@ describe("cursor ACP adapter protocol", () => {
       argvOverride: [process.execPath, fake],
     });
     const approvals: Array<{ decision: string }> = [];
-    await adapter.run(
+    const res = await adapter.run(
       request(),
       ctx({
         cwd: dir,
         approval: (a) => approvals.push({ decision: a.decision }),
       }),
     );
-    // The fake never actually sends a server request in this variant; the
-    // deny path is exercised by the bridge policy unit. Assert run completes.
-    expect(approvals.length).toBe(0);
+    expect(res.status).toBe("completed");
+    expect(approvals.length).toBeGreaterThan(0);
+    expect(approvals[0]?.decision).toBe("auto-denied");
   }, 20_000);
 });
 
@@ -275,6 +275,64 @@ describe("codex exec fallback", () => {
     expect(res.nativeId).toBe("ses-123");
     expect(res.continuation.supported).toBe(false);
     expect(res.continuation.how).toContain("codex exec resume");
+  }, 20_000);
+
+  it("passes sandbox_workspace_write.network_access matching ctx.networkPolicy", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-exec-net-"));
+    cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
+    const fake = materializeFake(
+      dir,
+      "fake-exec.cjs",
+      [
+        'require("fs").writeFileSync("argv.json", JSON.stringify(process.argv));',
+        "const NL = String.fromCharCode(10);",
+        "process.stdout.write(JSON.stringify({ msg: { type: 'agent_message', payload: { message: 'exec done' } } }) + NL);",
+        "process.exit(0);",
+      ].join("\n"),
+    );
+    const adapter = new CodexExecAdapter({
+      argvOverride: [process.execPath, fake],
+    });
+    await adapter.run(request(), ctx({ cwd: dir, networkPolicy: "denied" }));
+    const argv = JSON.parse(
+      fs.readFileSync(path.join(dir, "argv.json"), "utf8"),
+    ) as string[];
+    const flagAt = argv.indexOf("-c");
+    expect(flagAt).toBeGreaterThan(-1);
+    expect(argv[flagAt + 1]).toBe(
+      "sandbox_workspace_write.network_access=false",
+    );
+  }, 20_000);
+});
+
+describe("cursor ACP permission deny", () => {
+  it("cancels when no reject option exists instead of selecting an allow", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-acp-deny-"));
+    cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
+    const fake = materializeFake(
+      dir,
+      "fake-acp.cjs",
+      fakeCursorAcp({
+        requestPermission: true,
+        permissionOptionKinds: ["allow_once", "allow_always"],
+      }),
+    );
+    const adapter = new CursorAcpAdapter({
+      argvOverride: [process.execPath, fake],
+    });
+    const approvals: Array<{ decision: string; reason?: string }> = [];
+    const res = await adapter.run(
+      request(),
+      ctx({
+        cwd: dir,
+        approval: (a) =>
+          approvals.push({ decision: a.decision, reason: a.reason }),
+      }),
+    );
+    expect(res.status).toBe("completed");
+    expect(approvals.length).toBeGreaterThan(0);
+    expect(approvals[0]?.decision).toBe("auto-denied");
+    expect(approvals[0]?.reason).toMatch(/cancelled|no reject/i);
   }, 20_000);
 });
 

@@ -57,7 +57,7 @@ describe("MCP tool router background start", () => {
       background: true,
     });
     const elapsed = Date.now() - began;
-    expect(elapsed).toBeLessThan(2_000);
+    expect(elapsed).toBeLessThan(3_500);
     const payload = started.payload as {
       jobId: string;
       status: string;

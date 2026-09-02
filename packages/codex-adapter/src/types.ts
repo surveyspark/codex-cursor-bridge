@@ -33,6 +33,8 @@ export interface AdapterRunContext extends AdapterEventContext {
   debugLogging: boolean;
   networkPolicy: "denied" | "allowed";
   maxOutputBytes: number;
+  /** Env forwarded into the agent process so nested MCP calls can floor depth. */
+  handoffEnv?: Record<string, string>;
 }
 
 export interface AgentAdapter {

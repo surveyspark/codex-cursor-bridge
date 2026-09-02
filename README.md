@@ -51,7 +51,9 @@ Details in [docs/architecture.md](docs/architecture.md). Wire protocols in
 ## Trust & security model (short version)
 
 - **Read-only by default.** Investigation/review/plan modes cannot modify
-  your repo. Implementation requires an explicit mode + profile.
+  your repo: Codex uses a read-only sandbox, and Cursor read-only jobs run
+  in a disposable git worktree (writes fail the job). Implementation
+  requires an explicit mode + write profile.
 - **Isolated worktrees for writes.** Implementation jobs run in a temporary
   git worktree created from a recorded base ref. You get a patch artifact —
   nothing is merged automatically.
@@ -275,11 +277,11 @@ Strict JSON Schemas for inputs/outputs; no shell tool. Schemas live in
 
 ## Permission profiles
 
-| Profile                    | Effect                                                                         | Default for                                      |
-| -------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------ |
-| `read-only`                | Agent cannot modify files (Codex read-only sandbox; ACP write requests denied) | investigate / review / adversarial-review / plan |
-| `isolated-workspace-write` | Writes inside a temporary git worktree; patch returned                         | implement                                        |
-| `current-workspace-write`  | Writes to your current tree (your choice, warned when dirty)                   | —                                                |
+| Profile                    | Effect                                                                                                                                        | Default for                                      |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `read-only`                | Agent cannot modify files (Codex read-only sandbox; Cursor jobs use a disposable worktree and fail if it is dirty; ACP write requests denied) | investigate / review / adversarial-review / plan |
+| `isolated-workspace-write` | Writes inside a temporary git worktree; patch returned                                                                                        | implement                                        |
+| `current-workspace-write`  | Writes to your current tree (your choice, warned when dirty)                                                                                  | —                                                |
 
 ## Worktree behavior
 

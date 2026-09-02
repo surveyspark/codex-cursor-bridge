@@ -118,6 +118,8 @@ export class CursorSdkAdapter implements AgentAdapter {
     };
     if (request.permissionProfile !== "read-only") {
       agentOpts.openInCursorAfterCompletion = false;
+    } else {
+      agentOpts.local = { sandboxOptions: { enabled: true } };
     }
     let agent: SdkAgentLike;
     try {

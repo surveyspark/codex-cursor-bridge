@@ -11,6 +11,7 @@
  * validator that matches `schemas/handoff-plan.schema.json`.
  */
 
+import path from "node:path";
 import { BridgeError } from "./errors.js";
 import type { HandoffPlan, JobResult, StartRequest } from "./types.js";
 
@@ -381,6 +382,19 @@ const PROFILES = new Set([
   "current-workspace-write",
 ]);
 
+const READ_ONLY_MODES = new Set([
+  "investigate",
+  "review",
+  "adversarial-review",
+  "rescue",
+  "plan",
+]);
+
+const WRITE_PROFILES = new Set([
+  "isolated-workspace-write",
+  "current-workspace-write",
+]);
+
 /** Structural validation for job result payloads (schemas/result.schema.json). */
 export function validateJobResult(raw: unknown): ValidationResult<JobResult> {
   const issues: ValidationIssue[] = [];
@@ -480,8 +494,8 @@ export function validateStartRequest(
   if (!strLimit(s.task, 40000) || !isNonEmptyString(s.task)) {
     issues.push(issue("task", "required non-empty string (max 40000)"));
   }
-  if (!isNonEmptyString(s.cwd)) {
-    issues.push(issue("cwd", "required non-empty string"));
+  if (!isNonEmptyString(s.cwd) || !path.isAbsolute(s.cwd)) {
+    issues.push(issue("cwd", "required absolute path"));
   }
   if (s.mode !== undefined && (!isString(s.mode) || !MODES.has(s.mode))) {
     issues.push(issue("mode", "unknown delegation mode"));
@@ -494,6 +508,28 @@ export function validateStartRequest(
   }
   if (s.background !== undefined && typeof s.background !== "boolean") {
     issues.push(issue("background", "must be boolean"));
+  }
+  const mode = (s.mode as string | undefined) ?? "investigate";
+  const profile = s.permissionProfile as string | undefined;
+  if (
+    READ_ONLY_MODES.has(mode) &&
+    profile !== undefined &&
+    WRITE_PROFILES.has(profile)
+  ) {
+    issues.push(
+      issue(
+        "permissionProfile",
+        `${mode} is read-only and cannot use ${profile}`,
+      ),
+    );
+  }
+  if (mode === "implement" && profile === "read-only") {
+    issues.push(
+      issue(
+        "permissionProfile",
+        "implement requires a write profile (isolated-workspace-write or current-workspace-write)",
+      ),
+    );
   }
   if (
     s.model !== undefined &&

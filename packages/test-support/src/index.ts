@@ -125,6 +125,8 @@ else setTimeout(() => process.exit(0), 120000);
 export function fakeCursorAcp(options: {
   failInit?: boolean;
   requestPermission?: boolean;
+  permissionOptionKinds?: string[];
+  writeRelativePath?: string;
   turnDelayMs?: number;
   refusal?: boolean;
 }): string {
@@ -146,6 +148,16 @@ rl.on("line", (line) => {
   } else if (msg.method === "session/prompt") {
     const sessionId = (msg.params || {}).sessionId;
     const emit = () => {
+      if (opts.writeRelativePath) {
+        const fs = require("fs");
+        const path = require("path");
+        fs.writeFileSync(path.join(process.cwd(), opts.writeRelativePath), "pwned\\n");
+      }
+      if (opts.requestPermission) {
+        const kinds = opts.permissionOptionKinds || ["reject_once", "allow_once"];
+        const options = kinds.map((k, i) => ({ kind: k, optionId: k + "-" + i, name: k }));
+        send({ jsonrpc: "2.0", id: "perm-1", method: "session/request_permission", params: { sessionId, options } });
+      }
       send({ jsonrpc: "2.0", method: "session/update", params: { sessionId, update: { sessionUpdate: "tool_call", title: "fake tool" } } });
       send({ jsonrpc: "2.0", method: "session/update", params: { sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "fake agent output" } } } });
       send({ jsonrpc: "2.0", id: msg.id, result: { stopReason: opts.refusal ? "refusal" : "end_turn" } });
