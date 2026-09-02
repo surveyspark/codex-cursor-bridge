@@ -38,6 +38,9 @@ export interface ServeOptions {
   /** Config overrides (CLI flags). */
   configOverrides?: Record<string, unknown>;
   logger?: ReturnType<typeof createLogger>;
+  /** Override stdio (tests). Defaults to process.stdin / process.stdout. */
+  stdin?: NodeJS.ReadableStream;
+  stdout?: NodeJS.WritableStream;
 }
 
 interface PendingInit {
@@ -138,8 +141,12 @@ export async function serveMcp(opts: ServeOptions): Promise<void> {
 
   let initialized = false;
 
+  const stdin = opts.stdin ?? process.stdin;
+  const stdout = opts.stdout ?? process.stdout;
+  const ownsProcessStdio = opts.stdin === undefined;
+
   const send = (obj: unknown): void => {
-    process.stdout.write(JSON.stringify(obj) + "\n");
+    stdout.write(JSON.stringify(obj) + "\n");
   };
 
   const reply = (id: unknown, result: unknown): void =>
@@ -266,14 +273,20 @@ export async function serveMcp(opts: ServeOptions): Promise<void> {
       log.warn(`malformed JSON on stdin`, { error: String(err) }),
   });
 
-  process.stdin.setEncoding("utf8");
-  process.stdin.on("data", (chunk: string) => reader.push(chunk));
-  process.stdin.on("end", () => {
+  if ("setEncoding" in stdin && typeof stdin.setEncoding === "function") {
+    stdin.setEncoding("utf8");
+  }
+  stdin.on("data", (chunk: string | Buffer) =>
+    reader.push(typeof chunk === "string" ? chunk : chunk.toString("utf8")),
+  );
+  stdin.on("end", () => {
     reader.end();
-    process.exit(0);
+    if (ownsProcessStdio) process.exit(0);
   });
-  process.on("SIGTERM", () => process.exit(0));
-  process.on("SIGINT", () => process.exit(0));
+  if (ownsProcessStdio) {
+    process.on("SIGTERM", () => process.exit(0));
+    process.on("SIGINT", () => process.exit(0));
+  }
 
   log.info(`mcp server listening on stdio`, {
     host: opts.host,

@@ -34,7 +34,12 @@ export {
   selectCursorAdapter,
   buildTaskPrompt as buildCursorTaskPrompt,
 } from "@codex-cursor-bridge/cursor-adapter";
-export { JobManager, inspectGit } from "@codex-cursor-bridge/orchestrator";
+export {
+  JobManager,
+  inspectGit,
+  buildToolRouter,
+} from "@codex-cursor-bridge/orchestrator";
+export { serveMcp } from "@codex-cursor-bridge/mcp-server";
 export {
   fakeCodexAppServer,
   fakeCursorAcp,

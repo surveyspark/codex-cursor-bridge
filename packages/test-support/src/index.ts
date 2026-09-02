@@ -104,7 +104,7 @@ rl.on("line", (line) => {
         send({ jsonrpc: "2.0", id: "srv-1", method: "execCommandApproval", params: { threadId: p.threadId, turnId: "turn-1", command: "rm -rf /", cwd: process.cwd(), reason: "test" } });
       }
       send({ jsonrpc: "2.0", method: "item/completed", params: { threadId: p.threadId, turnId: "turn-1", completedAtMs: Date.now(), item: { id: "i1", type: "commandExecution", command: "echo fake", exitCode: 0, aggregatedOutput: "fake output with sk-abcdefghijklmnopqrstuvwx token", cwd: process.cwd(), status: "completed", commandActions: [] } } });
-      send({ jsonrpc: "2.0", method: "item/completed", params: { threadId: p.threadId, turnId: "turn-1", completedAtMs: Date.now(), item: { id: "i2", type: "agentMessage", text: "fake final message. ## Bridge summary\\nAll clear." } } });
+      send({ jsonrpc: "2.0", method: "item/completed", params: { threadId: p.threadId, turnId: "turn-1", completedAtMs: Date.now(), item: { id: "i2", type: "agentMessage", text: "fake final message. input=" + JSON.stringify(p.input || []).slice(0, 400) + " ## Bridge summary\\nAll clear." } } });
       send({ jsonrpc: "2.0", method: "turn/completed", params: { threadId: p.threadId, turn: { id: "turn-1", items: [], status: "completed" } } });
       send({ jsonrpc: "2.0", id: msg.id, result: { turnId: "turn-1" } });
     };

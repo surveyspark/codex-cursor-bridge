@@ -14,17 +14,20 @@ import {
   BridgeError,
   asBridgeError,
   canonicalize,
+  currentBootId,
   DEFAULT_CONFIG,
   type BridgeConfig,
   type JobRecord,
   type JobResult,
   type Logger,
   type StartRequest,
+  type TargetHost,
 } from "@codex-cursor-bridge/bridge-core";
 import { JobStore, newJobId } from "@codex-cursor-bridge/job-store";
-import type {
-  AgentAdapter,
-  AdapterRunContext,
+import {
+  buildFollowUpPrompt,
+  type AgentAdapter,
+  type AdapterRunContext,
 } from "@codex-cursor-bridge/codex-adapter";
 import {
   defaultWorktreeRoot,
@@ -89,7 +92,9 @@ export class JobManager {
   constructor(opts: JobManagerOptions) {
     const loaded = loadConfig(opts.repoRoot, opts.config);
     this.config = loaded.config;
-    void opts.logger;
+    if (opts.logger) {
+      for (const warning of loaded.warnings) opts.logger.warn(warning);
+    }
     this.repoRoot = canonicalize(opts.repoRoot);
     this.store = new JobStore({ jobsDir: jobsDir() });
     this.selectAdapter = opts.selectAdapter;
@@ -117,7 +122,12 @@ export class JobManager {
   /** Validate + create the job record (queued). */
   async enqueue(
     request: StartRequest,
-    origin: { host: JobRecord["originHost"]; tool?: string; client?: string },
+    origin: {
+      host: JobRecord["originHost"];
+      tool?: string;
+      client?: string;
+      targetHost?: TargetHost;
+    },
   ): Promise<StartJobResult> {
     const requestNorm: StartRequest = {
       ...request,
@@ -147,16 +157,11 @@ export class JobManager {
       requestNorm.origin!.maxHandoffDepth,
       HARD_MAX_HANDOFF_DEPTH,
     );
+    const targetHost = this.resolveTarget(origin);
     if (depth > maxDepth) {
       throw new BridgeError(
         "RECURSION_BLOCKED",
-        `delegation depth ${depth} exceeds maximum ${maxDepth}; nested ${origin.host} -> ${this.targetOf(origin.host)} delegation is blocked`,
-      );
-    }
-    if (origin.host !== "cli" && this.targetOf(origin.host) === undefined) {
-      throw new BridgeError(
-        "BRIDGE_USAGE",
-        `unknown origin host ${origin.host}`,
+        `delegation depth ${depth} exceeds maximum ${maxDepth}; nested ${origin.host} -> ${targetHost} delegation is blocked`,
       );
     }
 
@@ -168,8 +173,8 @@ export class JobManager {
       jobId,
       parentJobId: requestNorm.origin!.parentJobId ?? null,
       originHost: origin.host,
-      targetHost: this.targetOf(origin.host),
-      adapter: this.pendingAdapterName(origin.host),
+      targetHost,
+      adapter: this.pendingAdapterName(targetHost),
       nativeId: null,
       mode: requestNorm.mode,
       permissionProfile: requestNorm.permissionProfile,
@@ -338,6 +343,8 @@ export class JobManager {
       this.store.update(jobId, (r) => {
         r.status = "running";
         r.cwd = cwd;
+        r.pid = process.pid;
+        r.pidHostBootId = currentBootId();
       });
 
       const ctx: AdapterRunContext = {
@@ -533,11 +540,11 @@ export class JobManager {
     return result;
   }
 
-  /** Append a follow-up message; returns false when the adapter can't continue. */
+  /** Send a follow-up to the stored native session via the job's adapter. */
   async reply(
     jobId: string,
     message: string,
-  ): Promise<{ accepted: boolean; note?: string }> {
+  ): Promise<{ accepted: boolean; note?: string; result?: JobResult }> {
     const record = this.store.get(jobId);
     if (!record.nativeId) {
       this.store.update(jobId, (r) => {
@@ -556,17 +563,101 @@ export class JobManager {
         note: "job has no native session id to continue",
       };
     }
-    this.store.update(jobId, (r) => {
-      r.followUps = [
-        ...(r.followUps ?? []),
-        { ts: new Date().toISOString(), message },
-      ];
-    });
+    const request = this.requestFromRecord(record);
+    const { adapter } = await this.selectAdapter(request, record);
+    if (typeof adapter.reply !== "function") {
+      this.store.update(jobId, (r) => {
+        r.followUps = [
+          ...(r.followUps ?? []),
+          {
+            ts: new Date().toISOString(),
+            message,
+            accepted: false,
+            note: "adapter does not support continuation",
+          },
+        ];
+      });
+      return {
+        accepted: false,
+        note: "adapter does not support continuation",
+      };
+    }
+    const abort = new AbortController();
+    const timeoutMs = record.timeoutMs ?? this.config.defaultTimeoutMs;
+    const timer = setTimeout(
+      () => abort.abort(new Error("timeout")),
+      timeoutMs,
+    );
+    const ctx: AdapterRunContext = {
+      jobId,
+      cwd: record.cwd,
+      abortSignal: abort.signal,
+      debugLogging: this.config.debugLogging,
+      networkPolicy: this.config.networkPolicy,
+      maxOutputBytes: this.config.maxOutputBytes,
+      emit: (event) => {
+        this.store.appendEvent(jobId, event);
+      },
+      approval: (approval) => {
+        this.store.update(jobId, (r) => {
+          r.approvals = [...(r.approvals ?? []), approval].slice(-500);
+        });
+      },
+      onNativeId: (nativeId) => {
+        this.store.update(jobId, (r) => {
+          r.nativeId = nativeId;
+        });
+      },
+    };
     this.store.appendEvent(jobId, {
       type: "followup.requested",
       data: { nativeId: record.nativeId },
     });
-    return { accepted: true };
+    try {
+      const result = await adapter.reply(
+        record.nativeId,
+        buildFollowUpPrompt(message),
+        ctx,
+      );
+      this.store.update(jobId, (r) => {
+        r.followUps = [
+          ...(r.followUps ?? []),
+          {
+            ts: new Date().toISOString(),
+            message,
+            accepted: true,
+          },
+        ];
+        r.result = result;
+        r.nativeId = result.nativeId ?? r.nativeId ?? null;
+      });
+      this.store.appendEvent(jobId, {
+        type: "followup.completed",
+        data: { status: result.status, nativeId: result.nativeId },
+      });
+      return { accepted: true, result };
+    } catch (err) {
+      const be = asBridgeError(err);
+      this.store.update(jobId, (r) => {
+        r.followUps = [
+          ...(r.followUps ?? []),
+          {
+            ts: new Date().toISOString(),
+            message,
+            accepted: false,
+            note: be.message,
+          },
+        ];
+      });
+      this.store.appendEvent(jobId, {
+        type: "followup.failed",
+        level: "error",
+        data: { code: be.code, message: be.message },
+      });
+      return { accepted: false, note: be.message };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   get(jobId: string): JobRecord {
@@ -598,8 +689,19 @@ export class JobManager {
     return this.store.recover();
   }
 
-  private targetOf(host: JobRecord["originHost"]): JobRecord["targetHost"] {
-    return host === "cursor" ? "codex" : host === "codex" ? "cursor" : "codex";
+  private resolveTarget(origin: {
+    host: JobRecord["originHost"];
+    targetHost?: TargetHost;
+  }): TargetHost {
+    if (origin.targetHost === "cursor" || origin.targetHost === "codex") {
+      return origin.targetHost;
+    }
+    if (origin.host === "cursor") return "codex";
+    if (origin.host === "codex") return "cursor";
+    throw new BridgeError(
+      "BRIDGE_USAGE",
+      `cannot infer target host from origin "${origin.host}"; pass origin.targetHost`,
+    );
   }
 
   private profileForMode(
@@ -610,9 +712,9 @@ export class JobManager {
   }
 
   private pendingAdapterName(
-    originHost: JobRecord["originHost"],
+    targetHost: JobRecord["targetHost"],
   ): JobRecord["adapter"] {
-    return originHost === "codex" ? "cursor-sdk" : "codex-app-server";
+    return targetHost === "codex" ? "codex-app-server" : "cursor-sdk";
   }
 
   private requestFromRecord(record: JobRecord): StartRequest {

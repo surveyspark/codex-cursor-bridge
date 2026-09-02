@@ -24,7 +24,7 @@ import {
   validateStartRequest,
   type StartRequest,
 } from "@codex-cursor-bridge/bridge-core";
-import { JobStore, newJobId } from "@codex-cursor-bridge/job-store";
+import { JobStore } from "@codex-cursor-bridge/job-store";
 import {
   CodexAppServerAdapter,
   CodexExecAdapter,
@@ -38,6 +38,7 @@ import {
   stateRoot,
   defaultWorktreeRoot,
   BRIDGE_VERSION,
+  isCliEntrypoint,
 } from "./shared.js";
 import { runDemos } from "./demos.js";
 
@@ -305,6 +306,7 @@ async function main(argv: string[]): Promise<void> {
             host: "cli",
             tool: "cli",
             client: "terminal",
+            targetHost: host,
           });
           process.stdout.write(`job ${enq.jobId} queued (${host})\n`);
           const result = await manager.run(enq.jobId);
@@ -404,14 +406,17 @@ async function main(argv: string[]): Promise<void> {
           process.stdout.write(
             `sending follow-up to native session ${record.nativeId}...\n`,
           );
-          const result = await managerFollowUp(
-            host,
-            record.nativeId,
-            message,
-            repoRoot,
-            overrides,
-          );
-          process.stdout.write(`${result.summary}\n`);
+          const result = await manager.reply(jobId, message);
+          if (flags.has("json")) {
+            printJson(result);
+          } else if (result.accepted && result.result) {
+            process.stdout.write(`${result.result.summary}\n`);
+          } else {
+            process.stdout.write(
+              `follow-up not accepted: ${result.note ?? "unsupported"}\n`,
+            );
+            process.exitCode = 1;
+          }
           return;
         }
         case "cancel": {
@@ -529,46 +534,8 @@ async function main(argv: string[]): Promise<void> {
   }
 }
 
-/** Follow up on a native session by launching a fresh continuation job. */
-async function managerFollowUp(
-  host: "codex" | "cursor",
-  nativeId: string,
-  message: string,
-  repoRoot: string,
-  overrides: Record<string, unknown>,
-) {
-  void host;
-  void nativeId;
-  const manager = await makeManager(repoRoot, overrides);
-  const jobId = newJobId();
-  void jobId;
-  // Follow-ups are executed by the adapter layer through a new job; the
-  // manager records the linkage. Implementation detail: we create a job whose
-  // task references the native session and run it.
-  const request: StartRequest = {
-    task: message,
-    cwd: repoRoot,
-    mode: "investigate",
-    permissionProfile: "read-only",
-    background: false,
-    origin: { host: "cli", handoffDepth: 0, maxHandoffDepth: 1 },
-  };
-  const enq = await manager.enqueue(request, {
-    host: "cli",
-    tool: "cli reply",
-    client: "terminal",
-  });
-  const result = await manager.run(enq.jobId);
-  return {
-    summary: `${result.status}: ${result.summary}`,
-    jobId: result.jobId,
-    nativeId: result.nativeId,
-  };
-}
-
-const isMain =
-  process.argv[1] &&
-  import.meta.url.endsWith(process.argv[1]!.split("/").pop() ?? "\u0000");
-if (isMain) {
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
   main(process.argv.slice(2)).catch((err) => die(err));
 }
+
+export { main, isCliEntrypoint };

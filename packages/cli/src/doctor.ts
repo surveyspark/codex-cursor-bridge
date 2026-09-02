@@ -14,6 +14,8 @@ import {
   jobsDir,
   stateRoot,
   defaultWorktreeRoot,
+  DEFAULT_CONFIG,
+  asBridgeError,
   loadConfig,
   redactedConfig,
   resolveCursorCliName,
@@ -269,6 +271,14 @@ export async function runDoctor(opts: {
   try {
     const loaded = loadConfig(opts.repoRoot, undefined);
     loadedConfig = loaded.config;
+    for (const warning of loaded.warnings) {
+      add({
+        id: "config.project-key-ignored",
+        label: "Project config restriction",
+        status: "warn",
+        detail: warning,
+      });
+    }
     const selection = await selectAdapterQuietly(loadedConfig);
     add({
       id: "cursor.adapter-selection",
@@ -278,13 +288,13 @@ export async function runDoctor(opts: {
         selection ??
         "no adapter currently selectable (sdk/acp/cli all unavailable)",
     });
-  } catch {
-    loadedConfig = loadConfig(opts.repoRoot, undefined).config;
+  } catch (err) {
+    loadedConfig = { ...DEFAULT_CONFIG };
     add({
       id: "cursor.adapter-selection",
       label: "Cursor adapter selection",
       status: "warn",
-      detail: "evaluation failed",
+      detail: `evaluation failed: ${asBridgeError(err).message}`,
     });
   }
 

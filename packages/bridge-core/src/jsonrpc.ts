@@ -25,9 +25,14 @@ export class JsonLineReader {
     this.maxBytes = opts.maxMessageBytes ?? 16 * 1024 * 1024;
   }
 
+  /**
+   * Feed a raw stream chunk. Complete lines are dispatched; a trailing
+   * partial line is retained in the buffer until more bytes arrive or
+   * end() flushes it. This is what makes the reader incremental — raw
+   * stdin chunks (e.g. an MCP tools/call larger than the 64 KiB pipe
+   * high-water mark) arrive split across multiple push() calls.
+   */
   push(chunk: string): void {
-    // Accept both raw stream chunks and pre-split lines: a trailing newline
-    // is optional, so single lines passed by line-splitters dispatch too.
     this.pending += chunk;
     let idx: number;
     while ((idx = this.pending.indexOf("\n")) >= 0) {
@@ -36,17 +41,27 @@ export class JsonLineReader {
       if (raw.length === 0) continue;
       this.dispatch(raw);
     }
-    // No trailing newline: dispatch what we have (line-oriented transports).
-    if (this.pending.trim().length > 0) {
-      const raw = this.pending.trim();
-      this.pending = "";
-      this.dispatch(raw);
-    }
+    // Apply the size cap to the retained partial line. A logical line
+    // longer than maxBytes can never become valid JSON, so drop it and
+    // surface the condition through onOversized instead of waiting for a
+    // parse failure at end().
     if (this.pending.length > this.maxBytes) {
       const raw = this.pending;
       this.pending = "";
       this.opts.onOversized?.(raw);
     }
+  }
+
+  /**
+   * Dispatch a complete line directly (no buffering). For transports whose
+   * bytes were already split into whole lines upstream (the line splitter
+   * in process.ts) — makes that call-site contract explicit instead of
+   * incidental.
+   */
+  pushLine(line: string): void {
+    const raw = line.trim();
+    if (raw.length === 0) return;
+    this.dispatch(raw);
   }
 
   /** Flush any trailing partial line (no newline at EOF). */

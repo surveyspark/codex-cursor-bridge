@@ -220,7 +220,8 @@ describe("security: no listening ports by default", () => {
     );
     expect(src).not.toMatch(/\.listen\s*\(/);
     expect(src).not.toMatch(/net\.createServer/);
-    expect(src).toContain("process.stdout.write");
+    expect(src).toContain("stdout.write");
+    expect(src).toContain("opts.stdout ?? process.stdout");
   });
 });
 
