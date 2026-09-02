@@ -312,10 +312,11 @@ export class JobManager {
     }
     const git = await inspectGit(record.cwd);
     await this.gate();
-    const timeout = setTimeout(
-      () => abort.abort(new Error("timeout")),
-      record.timeoutMs ?? this.config.defaultTimeoutMs,
-    );
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      abort.abort(new Error("timeout"));
+    }, record.timeoutMs ?? this.config.defaultTimeoutMs);
 
     try {
       this.store.update(jobId, (r) => {
@@ -404,14 +405,23 @@ export class JobManager {
       };
 
       const result = await adapter.run(request, ctx);
+      if (timedOut && result.status !== "completed") {
+        result.status = "timed-out";
+        result.failure = {
+          code: "JOB_TIMEOUT",
+          message: `job exceeded its ${record.timeoutMs ?? this.config.defaultTimeoutMs}ms timeout and was terminated.`,
+          retriable: true,
+        };
+      }
       return await this.finalize(jobId, result, record.cwd);
     } catch (err) {
       const be = asBridgeError(err);
       const abortedExplicitly = this.cancelReasons.get(jobId) !== undefined;
-      const status =
-        be.code === "JOB_CANCELLED" || abortedExplicitly
-          ? "cancelled"
-          : be.code === "JOB_TIMEOUT" || abort.signal.aborted
+      const status = abortedExplicitly
+        ? "cancelled"
+        : timedOut || be.code === "JOB_TIMEOUT"
+          ? "timed-out"
+          : abort.signal.aborted
             ? "timed-out"
             : "failed";
       const result: JobResult = {

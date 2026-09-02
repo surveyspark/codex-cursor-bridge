@@ -77,6 +77,7 @@ export async function runDemos(
     return;
   }
 
+  fs.mkdirSync(path.join(ctx.repoRoot, ".handoff"), { recursive: true });
   const scratch = fs.mkdtempSync(path.join(ctx.repoRoot, ".handoff", "demo-"));
   const log = ctx.json ? getNullLogger() : createLogger({ level: "info" });
   try {
@@ -428,8 +429,15 @@ async function demo4(
       rejected: false,
       note: "UNEXPECTED: nested delegation was accepted",
     });
+    throw new Error("demo4: nested delegation was accepted");
   } catch (err) {
     const be = asBridgeError(err);
+    if (
+      be.code !== "RECURSION_BLOCKED" &&
+      !/exceeds maximum/.test(be.message)
+    ) {
+      throw err;
+    }
     report("demo4 recursion-blocked", { rejected: true, code: be.code });
   }
 }
@@ -476,6 +484,9 @@ async function demo5(
     status: result.status,
     cancelled: result.status === "cancelled",
   });
+  if (result.status !== "cancelled") {
+    throw new Error(`demo5: expected cancelled, got ${result.status}`);
+  }
 }
 
 function report(title: string, payload: Record<string, unknown>): void {

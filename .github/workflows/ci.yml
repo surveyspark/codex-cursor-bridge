@@ -28,6 +28,7 @@ jobs:
       - run: npm run build
       - run: npm run lint
       - run: npm run format:check
+      - run: npm run typecheck
       - run: npm run validate:manifests
       - run: npm test
       - name: Bundle smoke test
@@ -46,6 +47,7 @@ jobs:
           mkdir -p .handoff
           node bundles/codex-cursor-bridge.mjs demos run delegate-investigate
           node bundles/codex-cursor-bridge.mjs demos run plan-and-execute
+          node bundles/codex-cursor-bridge.mjs demos run worktree-isolation
           node bundles/codex-cursor-bridge.mjs demos run recursion-blocked
           node bundles/codex-cursor-bridge.mjs demos run cancel-kills-tree
 

@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -13,6 +13,16 @@ import {
 } from "../helpers.js";
 
 const cleanups: Array<() => void> = [];
+const originalStateDir = process.env.CCB_STATE_DIR;
+beforeEach(() => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-state-"));
+  process.env.CCB_STATE_DIR = dir;
+  cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
+});
+afterEach(() => {
+  if (originalStateDir === undefined) delete process.env.CCB_STATE_DIR;
+  else process.env.CCB_STATE_DIR = originalStateDir;
+});
 afterAll(() => {
   for (const c of cleanups) c();
 });

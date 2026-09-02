@@ -78,4 +78,46 @@ describe("MCP tool router background start", () => {
       stPayload.status,
     );
   }, 20_000);
+
+  it("rejects unknown start fields and never throws from invokeToolSafe", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-router-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const fake = materializeFake(scratch, "fake.cjs", fakeCodexAppServer({}));
+    const manager = new JobManager({
+      repoRoot: repo,
+      config: { worktreeRoot: path.join(scratch, "worktrees") },
+      selectAdapter: async () => ({
+        adapter: new CodexAppServerAdapter({
+          argvOverride: [process.execPath, fake],
+        }),
+        reason: "fake",
+      }),
+    });
+    const { invokeToolSafe } =
+      await import("@codex-cursor-bridge/orchestrator");
+    const tools = buildToolRouter({
+      originHost: "cursor",
+      prefix: "codex",
+      manager,
+    });
+    expect(tools.some((t) => t.name === "cursor_start")).toBe(false);
+    const start = tools.find((t) => t.name === "codex_start")!;
+    await expect(
+      start.handler({
+        task: "x",
+        cwd: repo,
+        extraField: true,
+      } as never),
+    ).rejects.toThrow(/BRIDGE_USAGE|unknown field/);
+    const safe = await invokeToolSafe(start, {
+      task: "x",
+      cwd: repo,
+      extraField: true,
+    } as never);
+    expect(safe.ok).toBe(false);
+    if (!safe.ok) expect(safe.code).toBe("BRIDGE_USAGE");
+  }, 20_000);
 });
