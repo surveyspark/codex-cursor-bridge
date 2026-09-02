@@ -10,6 +10,7 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
+import fs from "node:fs";
 import os from "node:os";
 import { BridgeError } from "./errors.js";
 
@@ -238,6 +239,16 @@ export function isPidAlive(pid: number): boolean {
 export function currentBootId(): string {
   const override = process.env.CCB_BOOT_ID;
   if (override && override.length > 0) return override;
-  const bootEpochSec = Math.round((Date.now() - os.uptime() * 1000) / 1000);
-  return `${process.platform}-${bootEpochSec}`;
+  try {
+    const linuxId = fs
+      .readFileSync("/proc/sys/kernel/random/boot_id", "utf8")
+      .trim();
+    if (linuxId.length > 0) return linuxId;
+  } catch {
+    // Not Linux, or unreadable.
+  }
+  // Date.now()/uptime can jitter by a few milliseconds across processes;
+  // a 10s bucket keeps sibling MCP servers on the same boot aligned.
+  const bootEpochMs = Date.now() - os.uptime() * 1000;
+  return `${process.platform}-${Math.round(bootEpochMs / 10_000)}`;
 }

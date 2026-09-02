@@ -244,11 +244,9 @@ export class JobManager {
   }
 
   /**
-   * Execute an enqueued job. When `wait` is false the runner detaches:
-   * the CLI runner child process records its pid in the job record, and
-   * `codex-cursor-bridge codex status/result` can poll it later. In this
-   * bundled design, MCP tools and the CLI both use wait=true by default and
-   * the background contract is preserved by job records surviving the run.
+   * Execute an enqueued job to completion and persist the result.
+   * Callers that advertise background jobs (`*_start` with background true)
+   * invoke this without awaiting so the tool can return the job id immediately.
    */
   async run(
     jobId: string,

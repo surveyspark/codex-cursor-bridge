@@ -1,5 +1,23 @@
-import { describe, expect, it } from "vitest";
-import { JsonLineReader } from "../helpers.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { currentBootId, JsonLineReader } from "../helpers.js";
+
+describe("currentBootId", () => {
+  const previous = process.env.CCB_BOOT_ID;
+  afterEach(() => {
+    if (previous === undefined) delete process.env.CCB_BOOT_ID;
+    else process.env.CCB_BOOT_ID = previous;
+  });
+
+  it("is stable across repeated calls in one process", () => {
+    delete process.env.CCB_BOOT_ID;
+    expect(currentBootId()).toBe(currentBootId());
+  });
+
+  it("honours CCB_BOOT_ID", () => {
+    process.env.CCB_BOOT_ID = "test-boot-id";
+    expect(currentBootId()).toBe("test-boot-id");
+  });
+});
 
 describe("JsonLineReader incremental buffering", () => {
   it("retains a partial line across push() calls and dispatches once complete", () => {
