@@ -119,6 +119,54 @@ describe("job manager integration", () => {
     expect(status.stdout.trim()).toBe("");
   }, 40_000);
 
+  it("includes new untracked files in the exported patch", async () => {
+    const { repo, cleanup } = await makeTempRepo({
+      files: { "src/app.ts": "export const a = 1;\n" },
+    });
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-int-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const fakeAcp = materializeFake(
+      scratch,
+      "fake-acp.cjs",
+      fakeCursorAcp({ writeRelativePath: "src/feature.ts" }),
+    );
+    const manager = new JobManager({
+      repoRoot: repo,
+      config: { worktreeRoot: path.join(scratch, "worktrees") },
+      selectAdapter: async () => ({
+        adapter: new CursorAcpAdapter({
+          argvOverride: [process.execPath, fakeAcp],
+        }),
+        reason: "fake",
+      }),
+    });
+    const enq = await manager.enqueue(
+      {
+        task: "add a file",
+        cwd: repo,
+        mode: "implement",
+        permissionProfile: "isolated-workspace-write",
+        background: false,
+      },
+      { host: "codex", tool: "cursor_start" },
+    );
+    const result = await manager.run(enq.jobId);
+    expect(result.status).toBe("completed");
+    expect(
+      result.changedFiles?.some((f) => f.path.includes("feature.ts")),
+    ).toBe(true);
+    expect(result.diffPatchPath).toBeTruthy();
+    const patch = fs.readFileSync(
+      path.join(repo, result.diffPatchPath!),
+      "utf8",
+    );
+    expect(patch).toMatch(/feature\.ts/);
+    const rec = manager.get(enq.jobId);
+    expect(rec.worktree?.baseRef).toMatch(/^[0-9a-f]{40}$/);
+  }, 40_000);
+
   it("rejects nested delegation beyond the depth cap", async () => {
     const { repo, cleanup } = await makeTempRepo({});
     cleanups.push(cleanup);

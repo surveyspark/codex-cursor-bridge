@@ -459,18 +459,16 @@ async function main(argv: string[]): Promise<void> {
         return;
       }
       if (sub === "clean") {
-        const store2 = new JobStore({ jobsDir: jobsDir() });
+        const repoRoot = findRepoRoot(flags.get("repo") as string | undefined);
+        const manager = await makeManager(repoRoot, {}, true);
         const dryRun = flags.has("dry-run");
-        const removed = store2.clean({
-          completedRetentionDays: 7,
-          failedRetentionDays: 14,
+        const cleaned = manager.clean({
           ...(dryRun ? { dryRun: true } : {}),
         });
-        if (flags.has("json"))
-          printJson({ removed, dryRun: flags.has("dry-run") });
+        if (flags.has("json")) printJson({ ...cleaned, dryRun });
         else
           process.stdout.write(
-            `${flags.has("dry-run") ? "would remove" : "removed"} ${removed.length} job(s)\n`,
+            `${dryRun ? "would remove" : "removed"} ${cleaned.removed.length} job(s)\n`,
           );
         return;
       }

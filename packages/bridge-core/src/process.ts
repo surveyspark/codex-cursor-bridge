@@ -12,6 +12,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
+import { StringDecoder } from "node:string_decoder";
 import { BridgeError } from "./errors.js";
 
 export interface SpawnOptions {
@@ -23,6 +24,8 @@ export interface SpawnOptions {
   stdinData?: string;
   onStdoutLine?: (line: string) => void;
   onStderrLine?: (line: string) => void;
+  /** Called when a logical line exceeds the splitter cap (the line is dropped). */
+  onOversizedLine?: (stream: "stdout" | "stderr") => void;
   abortSignal?: AbortSignal;
   /** Kill grace period before SIGKILL / taskkill /F. Default 3000ms. */
   killGraceMs?: number;
@@ -142,35 +145,37 @@ export function spawnProcess(opts: SpawnOptions): SpawnHandle {
     isErr: boolean,
   ): void => {
     if (!stream) return;
+    const decoder = new StringDecoder("utf8");
     let pending = "";
-    const maxLine = 1_000_000;
+    // Must exceed JsonLineReader's default 16 MiB cap so the reader, not the
+    // splitter, owns oversized-message handling.
+    const maxLine = 17 * 1024 * 1024;
+    const emit = (line: string): void => {
+      if (isErr) opts.onStderrLine?.(line);
+      else opts.onStdoutLine?.(line);
+    };
     stream.on("data", (chunk: Buffer) => {
-      pending += chunk.toString("utf8");
+      pending += decoder.write(chunk);
       let idx: number;
       while ((idx = pending.indexOf("\n")) >= 0) {
         let line = pending.slice(0, idx);
         pending = pending.slice(idx + 1);
         if (line.endsWith("\r")) line = line.slice(0, -1);
         if (line.length > maxLine) {
-          line = line.slice(0, maxLine) + "…[truncated]";
+          opts.onOversizedLine?.(isErr ? "stderr" : "stdout");
+          continue;
         }
-        if (isErr) opts.onStderrLine?.(line);
-        else opts.onStdoutLine?.(line);
+        emit(line);
       }
-      // Guard against unbounded partial-line growth.
       if (pending.length > maxLine) {
-        const flushed = pending.slice(0, maxLine) + "…[truncated]";
         pending = "";
-        if (isErr) opts.onStderrLine?.(flushed);
-        else opts.onStdoutLine?.(flushed);
+        opts.onOversizedLine?.(isErr ? "stderr" : "stdout");
       }
     });
     stream.on("end", () => {
-      if (pending.length > 0) {
-        if (isErr) opts.onStderrLine?.(pending);
-        else opts.onStdoutLine?.(pending);
-        pending = "";
-      }
+      pending += decoder.end();
+      if (pending.length > 0 && pending.length <= maxLine) emit(pending);
+      pending = "";
     });
   };
 
@@ -236,6 +241,42 @@ export function isPidAlive(pid: number): boolean {
  * crash recovery can tell a live process from a recycled pid after reboot.
  * Override with CCB_BOOT_ID in tests.
  */
+/** Terminate an arbitrary pid's process tree (cross-process cancel). */
+export async function killPidTree(pid: number, graceMs = 3000): Promise<void> {
+  if (!Number.isInteger(pid) || pid <= 0) return;
+  if (isWindows) {
+    const tk = spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
+      shell: false,
+      windowsHide: true,
+    });
+    await new Promise<void>((resolve) => tk.once("close", () => resolve()));
+    return;
+  }
+  try {
+    process.kill(-pid, "SIGTERM");
+  } catch {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      return;
+    }
+  }
+  const deadline = Date.now() + graceMs;
+  while (Date.now() < deadline) {
+    if (!isPidAlive(pid)) return;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      /* gone */
+    }
+  }
+}
+
 export function currentBootId(): string {
   const override = process.env.CCB_BOOT_ID;
   if (override && override.length > 0) return override;

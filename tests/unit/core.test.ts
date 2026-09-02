@@ -240,6 +240,21 @@ describe("redaction", () => {
     expect(text).not.toContain("abc.def.ghi-jkl-1234567890");
   });
 
+  it("redacts Authorization Basic credentials", () => {
+    const { text } = redactSecrets("Authorization: Basic dXNlcjpwYXNzd29yZA==");
+    expect(text).toContain("***REDACTED***");
+    expect(text).not.toContain("dXNlcjpwYXNzd29yZA==");
+  });
+
+  it("redacts secret-named keys in objects", () => {
+    const out = redactDeep({
+      OPENAI_API_KEY: "sk-secret-value-123456",
+      ok: "fine",
+    });
+    expect(out.OPENAI_API_KEY).toBe("***REDACTED***");
+    expect(out.ok).toBe("fine");
+  });
+
   it("redacts private keys", () => {
     const pem =
       "-----BEGIN RSA PRIVATE KEY-----\nMIIabc\nMIIdef\n-----END RSA PRIVATE KEY-----";

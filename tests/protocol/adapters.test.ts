@@ -363,6 +363,9 @@ describe("job store", () => {
       finishedAt: null,
     } as never);
     expect(store.exists(id)).toBe(true);
+    expect(() => store.get("../../etc/passwd")).toThrow(
+      /JOB_NOT_FOUND|not found/,
+    );
     store.setStatus(id, "starting");
     store.setStatus(id, "running");
     store.appendEvent(id, { type: "test.event" });

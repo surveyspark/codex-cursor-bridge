@@ -14,6 +14,7 @@
  * - Retention: `clean()` deletes terminal jobs past their retention window.
  */
 
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -50,6 +51,9 @@ export class JobStore {
   }
 
   jobDir(jobId: string): string {
+    if (!/^job_[0-9a-f]{32}$/.test(jobId)) {
+      throw new BridgeError("JOB_NOT_FOUND", `job ${jobId} not found`);
+    }
     return path.join(this.opts.jobsDir, jobId);
   }
 
@@ -99,7 +103,13 @@ export class JobStore {
       `.job.json.tmp-${process.pid}-${Date.now()}`,
     );
     const json = JSON.stringify(redactDeep(record), null, 2);
-    fs.writeFileSync(tmp, json, { mode: 0o600 });
+    const fd = fs.openSync(tmp, "w", 0o600);
+    try {
+      fs.writeSync(fd, json);
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
     try {
       fs.renameSync(tmp, file);
     } catch (err) {
@@ -242,22 +252,20 @@ export class JobStore {
     });
   }
 
-  lock(jobId: string, staleMs = 30_000): LockHandle {
-    const lockDir = path.join(this.jobDir(jobId), ".lock");
+  lock(jobId: string, _staleMs = 30_000): LockHandle {
+    const lockFile = path.join(this.jobDir(jobId), ".lock");
     const deadline = Date.now() + 10_000;
+    const payload = JSON.stringify({ pid: process.pid, at: nowIso() });
     for (;;) {
       try {
-        fs.mkdirSync(lockDir, { mode: 0o700 });
-        // Write owner info; cleanup on process exit is best-effort.
-        fs.writeFileSync(
-          path.join(lockDir, "owner"),
-          JSON.stringify({ pid: process.pid, at: nowIso() }),
-          { mode: 0o600 },
-        );
+        fs.writeFileSync(lockFile, payload, { flag: "wx", mode: 0o600 });
         return {
           release: () => {
             try {
-              fs.rmSync(lockDir, { recursive: true, force: true });
+              const owner = JSON.parse(fs.readFileSync(lockFile, "utf8")) as {
+                pid: number;
+              };
+              if (owner.pid === process.pid) fs.unlinkSync(lockFile);
             } catch {
               /* best effort */
             }
@@ -266,26 +274,16 @@ export class JobStore {
       } catch (err) {
         const e = err as NodeJS.ErrnoException;
         if (e.code !== "EEXIST") throw err;
-        // Stale lock takeover.
         try {
-          const ownerFile = path.join(lockDir, "owner");
-          const owner = JSON.parse(fs.readFileSync(ownerFile, "utf8")) as {
+          const owner = JSON.parse(fs.readFileSync(lockFile, "utf8")) as {
             pid: number;
-            at: string;
           };
-          const ageMs = Date.now() - Date.parse(owner.at);
-          if (!isPidAlive(owner.pid) || ageMs > staleMs) {
-            fs.rmSync(lockDir, { recursive: true, force: true });
+          if (!isPidAlive(owner.pid)) {
+            fs.unlinkSync(lockFile);
             continue;
           }
         } catch {
-          // No owner info or unreadable: treat as stale.
-          try {
-            fs.rmSync(lockDir, { recursive: true, force: true });
-          } catch {
-            /* ignore */
-          }
-          continue;
+          // Unreadable owner: do not steal; wait for the acquisition timeout.
         }
         if (Date.now() > deadline) {
           throw new BridgeError(
@@ -371,6 +369,17 @@ export class JobStore {
       if (now - finished > days * 86_400_000) {
         removed.push(record.jobId);
         if (!opts.dryRun) {
+          try {
+            if (record.repoRoot) {
+              execFileSync("git", ["worktree", "prune"], {
+                cwd: record.repoRoot,
+                timeout: 30_000,
+                stdio: "ignore",
+              });
+            }
+          } catch {
+            /* prune is best-effort */
+          }
           try {
             fs.rmSync(this.jobDir(record.jobId), {
               recursive: true,
