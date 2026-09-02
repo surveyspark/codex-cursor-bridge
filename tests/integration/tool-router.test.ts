@@ -77,6 +77,12 @@ describe("MCP tool router background start", () => {
     expect(["queued", "starting", "running", "completed"]).toContain(
       stPayload.status,
     );
+    const rec = manager.get(payload.jobId);
+    if (
+      !["completed", "failed", "cancelled", "timed-out"].includes(rec.status)
+    ) {
+      await manager.cancel(payload.jobId);
+    }
   }, 20_000);
 
   it("rejects unknown start fields and never throws from invokeToolSafe", async () => {

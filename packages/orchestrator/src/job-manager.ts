@@ -129,6 +129,20 @@ export class JobManager {
     if (next) next();
   }
 
+  /**
+   * Adapter stdio can flush after the job record is gone (background MCP
+   * start + test/process teardown, or retention cleanup). JOB_NOT_FOUND
+   * on those callbacks is expected; other errors still propagate.
+   */
+  private ignoreGoneJob(fn: () => void): void {
+    try {
+      fn();
+    } catch (err) {
+      if (asBridgeError(err).code === "JOB_NOT_FOUND") return;
+      throw err;
+    }
+  }
+
   /** Validate + create the job record (queued). */
   async enqueue(
     request: StartRequest,
@@ -390,16 +404,20 @@ export class JobManager {
           CCB_HANDOFF_DEPTH: String(this.store.get(jobId).handoffDepth),
         },
         emit: (event) => {
-          this.store.appendEvent(jobId, event);
+          this.ignoreGoneJob(() => this.store.appendEvent(jobId, event));
         },
         approval: (approval) => {
-          this.store.update(jobId, (r) => {
-            r.approvals = [...(r.approvals ?? []), approval].slice(-500);
+          this.ignoreGoneJob(() => {
+            this.store.update(jobId, (r) => {
+              r.approvals = [...(r.approvals ?? []), approval].slice(-500);
+            });
           });
         },
         onNativeId: (nativeId) => {
-          this.store.update(jobId, (r) => {
-            r.nativeId = nativeId;
+          this.ignoreGoneJob(() => {
+            this.store.update(jobId, (r) => {
+              r.nativeId = nativeId;
+            });
           });
         },
       };
