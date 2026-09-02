@@ -128,7 +128,7 @@ Key invariants:
 $CCB_STATE_DIR (default: OS state dir)
 ├── jobs/<job_id>/job.json     # job record (0600, atomic writes)
 ├── jobs/<job_id>/.lock/       # dir-lock during update
-├── jobs/<job_id>/debug/       # raw protocol events (debug builds only)
+├── jobs/<job_id>/debug/       # reserved; not written today
 ├── logs/                      # bridge logs (redacted)
 └── worktrees/                 # isolated worktrees
 
@@ -148,4 +148,5 @@ $CCB_STATE_DIR (default: OS state dir)
 `cursor_cancel`, `cursor_list`.
 
 There is no shell-command tool. Inputs/outputs use strict JSON Schemas
-(`schemas/*.json`); handoff plans are validated before execution.
+(`schemas/*.json`); when a structured `plan` is supplied on start it is
+validated with `validateHandoffPlan` before enqueue.

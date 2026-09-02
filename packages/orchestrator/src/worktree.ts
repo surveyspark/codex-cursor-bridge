@@ -5,9 +5,8 @@
  * - Never touches uncommitted work in the developer's current tree.
  * - Never merges automatically; produces a patch artifact + diff summary.
  * - Cleans up only on explicit request or retention.
- * - Handles non-git directories and repos without an initial commit
- *   gracefully (falls back to current-tree execution with a warning, or
- *   errors when isolation is impossible and required).
+ * - Repos that are not git, or have no initial commit, throw
+ *   WORKTREE_CREATE_FAILED (isolation is required for this path).
  */
 
 import {
