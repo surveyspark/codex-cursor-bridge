@@ -66,11 +66,9 @@ fs.copyFileSync(
 );
 fs.chmodSync(path.join(cliStage, "codex-cursor-bridge.mjs"), 0o755);
 fs.chmodSync(path.join(cliStage, "install.sh"), 0o755);
-fs.cpSync(
-  path.join(root, "plugins"),
-  path.join(cliStage, "plugins"),
-  { recursive: true },
-);
+fs.cpSync(path.join(root, "plugins"), path.join(cliStage, "plugins"), {
+  recursive: true,
+});
 await zipStaged(
   cliStage,
   path.join(releaseDir, `codex-cursor-bridge-cli-${version}.zip`),
