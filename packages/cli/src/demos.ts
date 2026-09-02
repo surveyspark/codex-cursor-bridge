@@ -23,6 +23,7 @@ import {
   type StartRequest,
 } from "@codex-cursor-bridge/bridge-core";
 import { JobManager } from "@codex-cursor-bridge/orchestrator";
+import { newJobId } from "@codex-cursor-bridge/job-store";
 import { CodexAppServerAdapter } from "@codex-cursor-bridge/codex-adapter";
 import { CursorAcpAdapter } from "@codex-cursor-bridge/cursor-adapter";
 import {
@@ -345,7 +346,7 @@ async function demo3(
   const wt = await createWorktree({
     repoRoot: ctx.repoRoot,
     worktreeRoot: path.join(scratch, "worktrees"),
-    jobId: "job_demo3aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    jobId: newJobId(),
   });
   const sample = path.join(wt.path, "bridge-demo-sample.txt");
   fs.writeFileSync(sample, "demo change from isolated worktree\n", {

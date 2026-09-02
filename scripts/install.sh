@@ -61,14 +61,18 @@ if [ "$CLI_ONLY" = "0" ] && [ "$PLUGINS_ONLY" = "0" ]; then CLI_INSTALL=1; else 
 if [ "$CLI_ONLY" = "1" ]; then CLI_INSTALL=1; fi
 
 if [ "$CLI_INSTALL" = "1" ]; then
-  if [ ! -f "${SCRIPT_DIR}/codex-cursor-bridge.mjs" ]; then
-    fail "codex-cursor-bridge.mjs not found next to install.sh (use the release archive)"
+  if [ -f "${SCRIPT_DIR}/codex-cursor-bridge.mjs" ]; then
+    CLI_BUNDLE="${SCRIPT_DIR}/codex-cursor-bridge.mjs"
+  elif [ -f "${SCRIPT_DIR}/../bundles/codex-cursor-bridge.mjs" ]; then
+    CLI_BUNDLE="${SCRIPT_DIR}/../bundles/codex-cursor-bridge.mjs"
+  else
+    fail "codex-cursor-bridge.mjs not found next to install.sh (use the release archive or build the repo)"
   fi
   run "mkdir -p '${BIN_DIR}'"
   if [ -e "${BIN_DIR}/codex-cursor-bridge" ] && [ "$FORCE" = "0" ] && [ "$DRY_RUN" = "0" ]; then
     log "existing CLI found at ${BIN_DIR}/codex-cursor-bridge (use --force to overwrite)"
   else
-    run "cp '${SCRIPT_DIR}/codex-cursor-bridge.mjs' '${BIN_DIR}/codex-cursor-bridge'"
+    run "cp '${CLI_BUNDLE}' '${BIN_DIR}/codex-cursor-bridge'"
     run "chmod +x '${BIN_DIR}/codex-cursor-bridge'"
     log "installed CLI: ${BIN_DIR}/codex-cursor-bridge"
   fi
@@ -98,8 +102,15 @@ install_plugin() {
 }
 
 if [ "$CLI_ONLY" != "1" ]; then
-  install_plugin "${SCRIPT_DIR}/../../plugins/cursor-delegates-to-codex" "${CURSOR_PLUGINS_DIR}/codex-cursor-bridge" "Cursor"
-  install_plugin "${SCRIPT_DIR}/../../plugins/codex-plans-cursor-executes" "${CODEX_PLUGINS_DIR}/codex-cursor-bridge" "Codex"
+  if [ -d "${SCRIPT_DIR}/plugins/cursor-delegates-to-codex" ]; then
+    PLUGIN_ROOT="${SCRIPT_DIR}/plugins"
+  elif [ -d "${SCRIPT_DIR}/../plugins/cursor-delegates-to-codex" ]; then
+    PLUGIN_ROOT="${SCRIPT_DIR}/../plugins"
+  else
+    fail "plugin sources not found next to install.sh (expected plugins/ in the archive or repo)"
+  fi
+  install_plugin "${PLUGIN_ROOT}/cursor-delegates-to-codex" "${CURSOR_PLUGINS_DIR}/codex-cursor-bridge" "Cursor"
+  install_plugin "${PLUGIN_ROOT}/codex-plans-cursor-executes" "${CODEX_PLUGINS_DIR}/codex-cursor-bridge" "Codex"
 fi
 
 log ""

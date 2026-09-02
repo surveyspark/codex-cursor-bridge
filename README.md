@@ -117,7 +117,9 @@ ln -s "$PWD" ~/.cursor/plugins/local/codex-cursor-bridge
 1. Install the CLI as above (`install.sh` places it).
 2. Copy/unzip `codex-cursor-bridge-plugin-codex-<ver>.zip` to
    `~/.codex/plugins/codex-cursor-bridge` (install.sh does this).
-3. Verify: `codex-cursor-bridge doctor` and `codex plugin list`.
+3. Register the MCP server with Codex (plugin manifests do not declare MCP):
+   `codex mcp add codex-cursor-bridge -- codex-cursor-bridge mcp --host codex`
+4. Verify: `codex-cursor-bridge doctor` and `codex plugin list`.
 
 ## First-run setup
 

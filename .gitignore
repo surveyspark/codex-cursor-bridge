@@ -12,7 +12,6 @@ coverage/
 
 # Bridge job state (never commit real job logs)
 .handoff/
-!handoff/.gitkeep
 
 # OS / editor
 .DS_Store
@@ -31,4 +30,3 @@ auth.json
 # Release artifacts
 release/
 *.tgz
-.handoff/

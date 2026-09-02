@@ -31,7 +31,10 @@ if (-not $nodeOk) { throw "Node.js >= 20.19 is required: https://nodejs.org" }
 
 if (-not $PluginsOnly) {
   $bundle = Join-Path $ScriptDir "codex-cursor-bridge.mjs"
-  if (-not (Test-Path $bundle)) { throw "codex-cursor-bridge.mjs not found next to install.ps1 (use the release archive)" }
+  if (-not (Test-Path $bundle)) {
+    $bundle = Join-Path $ScriptDir "..\bundles\codex-cursor-bridge.mjs"
+  }
+  if (-not (Test-Path $bundle)) { throw "codex-cursor-bridge.mjs not found next to install.ps1 (use the release archive or build the repo)" }
   Invoke-Step "create $BinDir" -Action { New-Item -ItemType Directory -Force -Path $BinDir | Out-Null }
   $dest = Join-Path $BinDir "codex-cursor-bridge.cmd"
   if ((Test-Path $dest) -and -not $Force) {
@@ -42,7 +45,9 @@ if (-not $PluginsOnly) {
 node "%~dp0codex-cursor-bridge.mjs" %*
 "@
     Invoke-Step "write $dest" -Action { Set-Content -Path $dest -Value $shim -Encoding ASCII }
-    Copy-Item $bundle (Join-Path $BinDir "codex-cursor-bridge.mjs") -Force:(-not $DryRun)
+    Invoke-Step "copy bundle" -Action {
+      Copy-Item $bundle (Join-Path $BinDir "codex-cursor-bridge.mjs") -Force
+    }
     Write-Host "installed CLI: $dest"
     Write-Host "note: add $BinDir to your PATH"
   }
@@ -51,9 +56,14 @@ node "%~dp0codex-cursor-bridge.mjs" %*
 if (-not $CliOnly) {
   $cursorPlugins = "$env:USERPROFILE\.cursor\plugins\local"
   $codexPlugins  = "$env:USERPROFILE\.codex\plugins"
+  $archivePlugins = Join-Path $ScriptDir "plugins"
+  $repoPlugins = Join-Path $ScriptDir "..\plugins"
+  $pluginRoot = if (Test-Path (Join-Path $archivePlugins "cursor-delegates-to-codex")) { $archivePlugins }
+    elseif (Test-Path (Join-Path $repoPlugins "cursor-delegates-to-codex")) { $repoPlugins }
+    else { throw "plugin sources not found next to install.ps1" }
   $pairs = @(
-    @{ Src = Join-Path $ScriptDir "..\..\plugins\cursor-delegates-to-codex"; Dest = Join-Path $cursorPlugins "codex-cursor-bridge"; Name = "Cursor" },
-    @{ Src = Join-Path $ScriptDir "..\..\plugins\codex-plans-cursor-executes"; Dest = Join-Path $codexPlugins "codex-cursor-bridge"; Name = "Codex" }
+    @{ Src = Join-Path $pluginRoot "cursor-delegates-to-codex"; Dest = Join-Path $cursorPlugins "codex-cursor-bridge"; Name = "Cursor" },
+    @{ Src = Join-Path $pluginRoot "codex-plans-cursor-executes"; Dest = Join-Path $codexPlugins "codex-cursor-bridge"; Name = "Codex" }
   )
   foreach ($p in $pairs) {
     if (-not (Test-Path $p.Src)) { throw "plugin source missing: $($p.Src)" }
@@ -62,8 +72,12 @@ if (-not $CliOnly) {
       continue
     }
     Invoke-Step "install $($p.Name) plugin to $($p.Dest)" -Action {
+      if (Test-Path $p.Dest) {
+        $backup = "$($p.Dest).bak.$(Get-Date -UFormat %s)"
+        Rename-Item $p.Dest $backup
+      }
       New-Item -ItemType Directory -Force -Path (Split-Path -Parent $p.Dest) | Out-Null
-      Copy-Item -Recurse -Force:$Force -Path $p.Src -Destination $p.Dest
+      Copy-Item -Recurse -Path $p.Src -Destination $p.Dest
     }
   }
 }

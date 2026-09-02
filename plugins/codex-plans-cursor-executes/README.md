@@ -23,7 +23,9 @@ This plugin packages:
    to place the CLI.
 2. Copy this plugin directory to `~/.codex/plugins/codex-cursor-bridge`
    (install.sh does this automatically).
-3. Verify: `codex-cursor-bridge doctor`.
+3. Register the MCP server (the Codex plugin manifest does not declare MCP):
+   `codex mcp add codex-cursor-bridge -- codex-cursor-bridge mcp --host codex`
+4. Verify: `codex-cursor-bridge doctor`.
 
 ## Usage in Codex
 

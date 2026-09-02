@@ -39,6 +39,7 @@ describe("doctor", () => {
       "bridge.version",
       "git.version",
       "codex.cli",
+      "codex.mcp-registration",
       "cursor.cli",
     ]) {
       expect(src).toContain(`id: "${id}"`);

@@ -139,6 +139,14 @@ export async function runDoctor(opts: {
   const appServer = new CodexAppServerAdapter();
   const codexStatus = await appServer.isAvailable();
   add({
+    id: "codex.mcp-registration",
+    label: "Codex MCP registration",
+    status: "info",
+    detail:
+      "Codex plugin manifests cannot declare MCP servers; register with: codex mcp add codex-cursor-bridge -- codex-cursor-bridge mcp --host codex",
+  });
+
+  add({
     id: "codex.cli",
     label: "Codex CLI",
     status: codexStatus.available ? "pass" : "warn",
