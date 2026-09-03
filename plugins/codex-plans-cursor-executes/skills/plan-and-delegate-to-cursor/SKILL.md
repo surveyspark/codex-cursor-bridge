@@ -35,10 +35,9 @@ Compose a JSON plan matching the bridge's handoff-plan contract:
 - `allowedPaths` (repo-relative globs — the executor may write ONLY these)
 - `forbiddenActions`, `plannerSummary`
 
-Validate it before handing off (e.g. with
-`codex-cursor-bridge` plan tooling or strict self-review against the schema in
-`schemas/handoff-plan.schema.json` at the repository root of the bridge
-install). An invalid plan is rejected before Cursor starts.
+Validate it before handing off: pass the JSON as `plan` on `cursor_start`
+(the bridge runs `validateHandoffPlan` and rejects invalid plans) or
+self-review against `schemas/handoff-plan.schema.json`.
 
 ## Phase 3 — delegate execution
 

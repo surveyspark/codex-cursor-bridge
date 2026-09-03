@@ -115,6 +115,6 @@ explicitly choose `current-workspace-write`.
 
 ## Debug logging
 
-Set `debugLogging: true` (config) or `CCB_DEBUG=1`; raw protocol events are
-then persisted under `<jobDir>/debug/` and stderr lines are kept. Logs are
-redacted, but review before sharing.
+`--debug` (or `debugLogging: true` in config) emits extra **redacted**
+per-line events on the job record. `CCB_DEBUG=1` only raises the logger
+level. Raw protocol transcripts are not written to disk.

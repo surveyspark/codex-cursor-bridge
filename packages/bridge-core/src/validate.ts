@@ -568,7 +568,15 @@ export function validateStartRequest(
     "origin",
     "constraints",
     "expectedOutput",
+    "plan",
   ]);
+  if (s.plan !== undefined) {
+    const planVr = validateHandoffPlan(s.plan);
+    if (!planVr.ok) {
+      for (const i of planVr.issues)
+        issues.push(issue(`plan.${i.path}`, i.message));
+    }
+  }
   for (const k of Object.keys(s)) {
     if (!known.has(k)) issues.push(issue(k, "unknown field"));
   }

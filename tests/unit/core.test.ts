@@ -214,6 +214,15 @@ describe("start request validation", () => {
     }
   });
 
+  it("rejects a malformed structured plan on start", () => {
+    const r = validateStartRequest({
+      task: "x",
+      cwd: "/tmp",
+      plan: { schemaVersion: "2.0" },
+    });
+    expect(r.ok).toBe(false);
+  });
+
   it("rejects implement + read-only", () => {
     const r = validateStartRequest({
       task: "x",

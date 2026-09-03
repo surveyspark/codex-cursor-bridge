@@ -21,6 +21,9 @@ import {
   isPidAlive,
   killPidTree,
   TERMINAL_JOB_STATUSES,
+  validateHandoffPlan,
+  validateJobResult,
+  planValidationError,
   type BridgeConfig,
   type JobRecord,
   type JobResult,
@@ -161,6 +164,10 @@ export class JobManager {
     const permissionProfile =
       request.permissionProfile ?? this.profileForMode(mode);
     this.assertModeProfile(mode, permissionProfile);
+    if (request.plan) {
+      const planVr = validateHandoffPlan(request.plan);
+      if (!planVr.ok) throw planValidationError(request.plan);
+    }
 
     const parentJobId =
       request.origin?.parentJobId ?? process.env.CCB_PARENT_JOB_ID ?? undefined;
@@ -497,6 +504,13 @@ export class JobManager {
     const record = this.store.get(jobId);
     if (TERMINAL_JOB_STATUSES.has(record.status) && record.result) {
       return record.result;
+    }
+    const resultCheck = validateJobResult(result);
+    if (!resultCheck.ok) {
+      result.warnings = [
+        ...(result.warnings ?? []),
+        `result schema: ${resultCheck.issues.map((i) => `${i.path}: ${i.message}`).join("; ")}`,
+      ];
     }
     // Diff collection for write modes and for read-only jobs that used a
     // disposable worktree (Cursor) so a dirty tree cannot report completed.

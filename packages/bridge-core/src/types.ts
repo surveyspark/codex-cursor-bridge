@@ -82,6 +82,8 @@ export interface StartRequest {
   constraints?: string[];
   /** Expected output description. */
   expectedOutput?: string;
+  /** Optional structured handoff plan; validated when present. */
+  plan?: HandoffPlan;
 }
 
 export interface DiffStat {

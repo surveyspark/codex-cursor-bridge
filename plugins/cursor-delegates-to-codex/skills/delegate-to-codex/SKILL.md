@@ -84,5 +84,5 @@ From `codex_result`:
   continued via the bridge (`codex_reply`) and via `codex resume` on the CLI;
   do not claim they appear in any particular app's history UI unless verified.
 
-Deep references: see `references/modes.md`, `references/task-templates.md`,
+Deep references: see `references/modes.md`, `references/prompt-injection.md`,
 and `references/troubleshooting.md` in this skill directory.

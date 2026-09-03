@@ -71,6 +71,7 @@ Full threat model: [docs/security-model.md](docs/security-model.md).
 ## Requirements
 
 - Node.js ≥ 20.19, npm ≥ 10, git ≥ 2.30
+- `zip` is required for `npm run package` (release archives)
 - For Cursor→Codex: the Codex CLI, installed and logged in
   (`npm i -g @openai/codex && codex login`)
 - For Codex→Cursor, one of:
@@ -126,9 +127,15 @@ codex-cursor-bridge doctor
 
 - Fix every ✗ using the printed `→` remediation.
 - Optional: create `~/.config/codex-cursor-bridge/config.json` (or
-  `<repo>/.handoff/config.json`) — see
-  [docs/architecture.md](docs/architecture.md) for the full schema. Show the
-  effective config with `codex-cursor-bridge config show`.
+  `<repo>/.handoff/config.json`). Schema: `schemas/config.schema.json`.
+  Show the effective config with `codex-cursor-bridge config show`.
+  Precedence: defaults → user config → project config (untrusted keys
+  ignored) → CLI flags → `CCB_*` environment variables.
+- Environment: `CCB_STATE_DIR` (job/state root), `CCB_CODEX_BINARY`,
+  `CCB_CURSOR_BINARY`, `CCB_DEBUG` (raises log level; does not dump raw
+  protocol files), `CCB_BOOT_ID` (tests), `CCB_PARENT_JOB_ID` /
+  `CCB_HANDOFF_DEPTH` (nested MCP floor). `--debug` sets
+  `debugLogging` on the config.
 - The bridge never modifies your global Cursor/Codex configuration.
 
 ## Authentication
@@ -296,8 +303,10 @@ Strict JSON Schemas for inputs/outputs; no shell tool. Schemas live in
 
 ## Job lifecycle
 
-`queued → starting → running → (waiting-for-approval | waiting-for-input) →
-completed | failed | cancelled | timed-out`
+`queued → starting → running → completed | failed | cancelled | timed-out`
+
+Approvals are auto-denied by design, so `waiting-for-approval` /
+`waiting-for-input` are not used on the production path.
 
 States, records, locking, retention, and crash recovery are documented in
 [docs/architecture.md](docs/architecture.md).
@@ -343,18 +352,18 @@ and plugin discovery.
 rm ~/.local/bin/codex-cursor-bridge            # or your --bin-dir
 rm -rf ~/.cursor/plugins/local/codex-cursor-bridge
 rm -rf ~/.codex/plugins/codex-cursor-bridge
-rm -rf "$(codex-cursor-bridge doctor --json | jq -r .stateRoot)"   # job state (optional)
+# job state (optional): read stateRoot from `codex-cursor-bridge doctor --json`
 ```
 
 Nothing else was modified: no global editor config, no shell rc files.
 
 ## Compatibility
 
-| Component  | Minimum tested                      |
+| Component  | Minimum supported                   |
 | ---------- | ----------------------------------- |
 | Node.js    | 20.19                               |
 | Codex CLI  | 0.145.0 (app-server protocol)       |
-| Cursor CLI | 1.0.x (acp/print) — see notes       |
+| Cursor CLI | 1.0.x (documentation/fakes only)    |
 | OS         | macOS (tested), Linux, Windows (CI) |
 
 Full matrix, verification status, and documented deviations:
