@@ -41,6 +41,7 @@ import {
   buildChildEnv,
   redactString,
   spawnProcess,
+  BRIDGE_VERSION,
   type JobResult,
   type StartRequest,
 } from "@codex-cursor-bridge/bridge-core";
@@ -169,7 +170,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
           clientInfo: {
             name: "codex-cursor-bridge",
             title: "codex-cursor-bridge",
-            version: "0.1.0",
+            version: BRIDGE_VERSION,
           },
         },
         INIT_TIMEOUT_MS,
@@ -447,7 +448,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
             clientInfo: {
               name: "codex-cursor-bridge",
               title: "codex-cursor-bridge",
-              version: "0.1.0",
+              version: BRIDGE_VERSION,
             },
           },
           INIT_TIMEOUT_MS,

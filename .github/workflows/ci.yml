@@ -4,6 +4,16 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      run_codex_e2e:
+        description: Run live Codex e2e (requires login on the runner)
+        type: boolean
+        default: false
+      run_cursor_e2e:
+        description: Run live Cursor e2e (requires login on the runner)
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -51,6 +61,24 @@ jobs:
           node bundles/codex-cursor-bridge.mjs demos run recursion-blocked
           node bundles/codex-cursor-bridge.mjs demos run cancel-kills-tree
 
+  e2e:
+    name: e2e (workflow_dispatch)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Run e2e against real CLIs
+        env:
+          RUN_CODEX_E2E: ${{ inputs.run_codex_e2e && '1' || '' }}
+          RUN_CURSOR_E2E: ${{ inputs.run_cursor_e2e && '1' || '' }}
+        run: npm run test:e2e
+
   package-validation:
     name: package validation
     runs-on: ubuntu-latest
@@ -71,6 +99,11 @@ jobs:
         run: |
           cd release && unzip -q codex-cursor-bridge-cli-*.zip -d smoke
           node smoke/codex-cursor-bridge/codex-cursor-bridge.mjs --version
+          bash smoke/codex-cursor-bridge/install.sh --dry-run
+          BIN="$(mktemp -d)"
+          bash smoke/codex-cursor-bridge/install.sh --bin-dir "$BIN"
+          test -e "$BIN/codex-cursor-bridge"
+          node "$BIN/codex-cursor-bridge" --version | grep -E '[0-9]+\.[0-9]+\.[0-9]+'
           node smoke/codex-cursor-bridge/codex-cursor-bridge.mjs doctor --json > /dev/null && echo "doctor json ok (exit $? tolerated)"
       - uses: actions/upload-artifact@v4
         with:

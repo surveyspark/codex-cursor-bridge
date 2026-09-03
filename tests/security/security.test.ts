@@ -404,7 +404,12 @@ describe("security: derived handoff depth", () => {
           mode: "investigate",
           permissionProfile: "read-only",
           background: false,
-          origin: { host: "cursor", parentJobId: parent.jobId },
+          origin: {
+            host: "cursor",
+            parentJobId: parent.jobId,
+            handoffDepth: 0,
+            maxHandoffDepth: 1,
+          },
         },
         { host: "cursor" },
       ),
