@@ -125,18 +125,20 @@ export async function createWorktree(
   }
   fs.mkdirSync(opts.worktreeRoot, { recursive: true, mode: 0o700 });
 
-  // Resolve base ref: explicit > current branch > HEAD
-  let baseRef = opts.baseRef ?? info.branch ?? "HEAD";
-  // Validate the ref resolves (no injection risk: argument array, and we verify)
+  // Resolve base ref: explicit > current branch > HEAD, then pin to a SHA
+  // so later commits on that branch cannot reverse-diff the patch.
+  const requested = opts.baseRef ?? info.branch ?? "HEAD";
+  let baseRef: string;
   try {
-    await execFileAsync(
+    const { stdout } = await execFileAsync(
       "git",
-      ["rev-parse", "--verify", "--quiet", `${baseRef}^{commit}`],
+      ["rev-parse", "--verify", `${requested}^{commit}`],
       {
         cwd: opts.repoRoot,
         timeout: 10_000,
       },
     );
+    baseRef = stdout.trim();
   } catch {
     if (opts.baseRef) {
       throw new BridgeError(
@@ -144,7 +146,12 @@ export async function createWorktree(
         `base ref "${opts.baseRef}" does not resolve to a commit`,
       );
     }
-    baseRef = "HEAD";
+    const { stdout } = await execFileAsync(
+      "git",
+      ["rev-parse", "--verify", "HEAD"],
+      { cwd: opts.repoRoot, timeout: 10_000 },
+    );
+    baseRef = stdout.trim();
   }
 
   const short = opts.jobId.replace(/^job_/, "").slice(0, 8);
@@ -224,6 +231,10 @@ export async function collectWorktreeDiff(
   try {
     // Include untracked files in the stat by adding intent-to-add? Never touch
     // the index destructively; use status + numstat instead.
+    await execFileAsync("git", ["add", "-N", "."], {
+      cwd: wt.path,
+      timeout: 30_000,
+    }).catch(() => undefined);
     const numstat = await execFileAsync(
       "git",
       ["diff", "--numstat", wt.baseRef],

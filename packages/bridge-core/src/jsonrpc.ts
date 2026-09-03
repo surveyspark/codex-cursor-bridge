@@ -76,8 +76,14 @@ export class JsonLineReader {
       this.opts.onOversized?.(raw);
       return;
     }
+    let msg: unknown;
     try {
-      const msg: unknown = JSON.parse(raw);
+      msg = JSON.parse(raw);
+    } catch (err) {
+      this.opts.onMalformed?.(err, raw);
+      return;
+    }
+    try {
       this.opts.onMessage(msg, raw);
     } catch (err) {
       this.opts.onMalformed?.(err, raw);
@@ -219,8 +225,9 @@ export class JsonRpcConnection {
     try {
       this.opts.send(JSON.stringify(obj));
     } catch {
-      // Transport died mid-write; waitExit/exit handling reports it.
-      this.closed = true;
+      // Transport died mid-write: fail in-flight requests instead of waiting
+      // for each timeout.
+      this.close();
     }
   }
 

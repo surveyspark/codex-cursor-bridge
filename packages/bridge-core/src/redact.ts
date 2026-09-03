@@ -73,7 +73,7 @@ const PATTERNS: Array<{ name: string; re: RegExp; replace: string }> = [
   },
   {
     name: "authorization-header",
-    re: /\b(authorization|proxy-authorization)\s*:\s*\S+/gi,
+    re: /\b(authorization|proxy-authorization)\s*:\s*[^\r\n]+/gi,
     replace: "$1: ***REDACTED***",
   },
   // Cookies
@@ -150,7 +150,11 @@ export function redactDeep<T>(value: T, depth = 0): T {
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = redactDeep(v, depth + 1);
+      if (isSecretEnvName(k) && typeof v === "string") {
+        out[k] = "***REDACTED***";
+      } else {
+        out[k] = redactDeep(v, depth + 1);
+      }
     }
     return out as unknown as T;
   }

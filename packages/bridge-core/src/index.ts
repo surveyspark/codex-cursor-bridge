@@ -66,6 +66,7 @@ export {
   buildChildEnv,
   isPidAlive,
   currentBootId,
+  killPidTree,
 } from "./process.js";
 export {
   resolveCursorCliName,

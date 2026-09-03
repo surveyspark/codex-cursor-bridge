@@ -245,7 +245,9 @@ export class CursorAcpAdapter implements AgentAdapter {
       },
     });
 
-    await rpc.request(
+    child.done.catch(() => undefined);
+    let initializeSettled = false;
+    const initialize = rpc.request(
       "initialize",
       {
         protocolVersion: ACP_PROTOCOL_VERSION,
@@ -255,6 +257,15 @@ export class CursorAcpAdapter implements AgentAdapter {
       },
       INIT_TIMEOUT_MS,
     );
+    const childFailed = child.done.then((outcome) => {
+      if (initializeSettled) return;
+      throw new BridgeError(
+        "CHILD_EXITED",
+        `ACP child exited during initialize (code ${outcome.code})`,
+      );
+    });
+    await Promise.race([initialize, childFailed]);
+    initializeSettled = true;
     rpc.notify("initialized");
 
     // New session or continuation of an existing one.

@@ -18,6 +18,9 @@ import {
   canonicalize,
   currentBootId,
   DEFAULT_CONFIG,
+  isPidAlive,
+  killPidTree,
+  TERMINAL_JOB_STATUSES,
   type BridgeConfig,
   type JobRecord,
   type JobResult,
@@ -25,7 +28,11 @@ import {
   type StartRequest,
   type TargetHost,
 } from "@codex-cursor-bridge/bridge-core";
-import { JobStore, newJobId } from "@codex-cursor-bridge/job-store";
+import {
+  JobStore,
+  assertTransition,
+  newJobId,
+} from "@codex-cursor-bridge/job-store";
 import {
   buildFollowUpPrompt,
   type AgentAdapter,
@@ -42,6 +49,7 @@ import {
   collectWorktreeDiff,
   createWorktree,
   inspectGit,
+  removeWorktree,
 } from "./worktree.js";
 
 export interface JobManagerOptions {
@@ -311,6 +319,7 @@ export class JobManager {
 
     try {
       this.store.update(jobId, (r) => {
+        assertTransition(r.status, "starting");
         r.status = "starting";
         r.startedAt = new Date().toISOString();
       });
@@ -361,6 +370,7 @@ export class JobManager {
       }
 
       this.store.update(jobId, (r) => {
+        assertTransition(r.status, "running");
         r.status = "running";
         r.cwd = cwd;
         r.pid = process.pid;
@@ -427,7 +437,20 @@ export class JobManager {
           retriable: be.retriable,
         },
       };
-      return await this.finalize(jobId, result, record.cwd);
+      const finalized = await this.finalize(jobId, result, record.cwd);
+      const rec = this.store.tryGet(jobId);
+      if (
+        rec?.worktree &&
+        finalized.status !== "completed" &&
+        (finalized.changedFiles?.length ?? 0) === 0
+      ) {
+        try {
+          await removeWorktree(this.repoRoot, rec.worktree.path);
+        } catch {
+          /* best effort */
+        }
+      }
+      return finalized;
     } finally {
       clearTimeout(timeout);
       this.aborts.delete(jobId);
@@ -444,6 +467,9 @@ export class JobManager {
     originalCwd: string,
   ): Promise<JobResult> {
     const record = this.store.get(jobId);
+    if (TERMINAL_JOB_STATUSES.has(record.status) && record.result) {
+      return record.result;
+    }
     // Diff collection for write modes and for read-only jobs that used a
     // disposable worktree (Cursor) so a dirty tree cannot report completed.
     if (result.status === "completed") {
@@ -506,6 +532,8 @@ export class JobManager {
     }
 
     this.store.update(jobId, (r) => {
+      if (TERMINAL_JOB_STATUSES.has(r.status) && r.result) return;
+      assertTransition(r.status, result.status);
       r.status = result.status;
       r.finishedAt = result.finishedAt ?? new Date().toISOString();
       r.result = result;
@@ -533,9 +561,10 @@ export class JobManager {
     const abort = this.aborts.get(jobId);
     if (abort) {
       abort.abort(new Error(reason));
-    } else {
-      // Not running in this process: mark cancelled anyway (queued/stale).
+    } else if (record.status === "queued") {
       this.store.update(jobId, (r) => {
+        if (TERMINAL_JOB_STATUSES.has(r.status)) return;
+        assertTransition(r.status, "cancelled");
         r.status = "cancelled";
         r.finishedAt = new Date().toISOString();
       });
@@ -544,6 +573,28 @@ export class JobManager {
         level: "warn",
         data: { reason },
       });
+    } else if (
+      record.pid &&
+      record.pidHostBootId === currentBootId() &&
+      isPidAlive(record.pid)
+    ) {
+      await killPidTree(record.pid);
+      this.store.update(jobId, (r) => {
+        if (TERMINAL_JOB_STATUSES.has(r.status)) return;
+        assertTransition(r.status, "cancelled");
+        r.status = "cancelled";
+        r.finishedAt = new Date().toISOString();
+      });
+      this.store.appendEvent(jobId, {
+        type: "job.cancelled",
+        level: "warn",
+        data: { reason, pid: record.pid },
+      });
+    } else {
+      throw new BridgeError(
+        "BRIDGE_NOT_SUPPORTED",
+        `job ${jobId} is owned by another process and cannot be cancelled from here`,
+      );
     }
     const result: JobResult = {
       jobId,
