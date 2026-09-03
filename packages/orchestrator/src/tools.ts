@@ -202,6 +202,20 @@ export function buildToolRouter(opts: RouterOptions): ToolDef[] {
         tool: `${target}_start`,
         client: "mcp",
       });
+      const background = request.background !== false;
+      if (background) {
+        void manager.run(enq.jobId).catch(() => {
+          // run() persists failure on the job record.
+        });
+        return {
+          payload: {
+            jobId: enq.jobId,
+            nativeId: null,
+            status: "queued",
+          },
+          summary: `${target} job ${enq.jobId} queued`,
+        };
+      }
       const result = await manager.run(enq.jobId);
       return {
         payload: {
@@ -307,9 +321,10 @@ export function buildToolRouter(opts: RouterOptions): ToolDef[] {
           nativeId: record.nativeId,
           accepted: res.accepted,
           note: res.note,
+          result: res.result ?? null,
         },
         summary: res.accepted
-          ? `follow-up queued for ${target} session ${record.nativeId}; run a follow-up job via the CLI to receive the answer`
+          ? `follow-up sent to ${target} session ${record.nativeId}`
           : `follow-up not accepted: ${res.note ?? "unsupported"}`,
       };
     },

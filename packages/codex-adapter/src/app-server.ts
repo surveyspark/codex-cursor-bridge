@@ -225,7 +225,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
         ],
         this.opts.extraEnv,
       ),
-      onStdoutLine: (line) => reader.push(line),
+      onStdoutLine: (line) => reader.pushLine(line),
       onStderrLine: (line) => {
         ctx.emit({
           type: "codex.stderr",

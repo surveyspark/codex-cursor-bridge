@@ -10,6 +10,8 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
 import { BridgeError } from "./errors.js";
 
 export interface SpawnOptions {
@@ -227,4 +229,26 @@ export function isPidAlive(pid: number): boolean {
     if (e.code === "EPERM") return true; // exists but not ours
     return false;
   }
+}
+
+/**
+ * Identifier for the current OS boot. Combined with a recorded pid so
+ * crash recovery can tell a live process from a recycled pid after reboot.
+ * Override with CCB_BOOT_ID in tests.
+ */
+export function currentBootId(): string {
+  const override = process.env.CCB_BOOT_ID;
+  if (override && override.length > 0) return override;
+  try {
+    const linuxId = fs
+      .readFileSync("/proc/sys/kernel/random/boot_id", "utf8")
+      .trim();
+    if (linuxId.length > 0) return linuxId;
+  } catch {
+    // Not Linux, or unreadable.
+  }
+  // Date.now()/uptime can jitter by a few milliseconds across processes;
+  // a 10s bucket keeps sibling MCP servers on the same boot aligned.
+  const bootEpochMs = Date.now() - os.uptime() * 1000;
+  return `${process.platform}-${Math.round(bootEpochMs / 10_000)}`;
 }

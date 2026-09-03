@@ -155,7 +155,7 @@ export class CursorAcpAdapter implements AgentAdapter {
       cwd: ctx.cwd,
       argv: this.argvBase(),
       env: buildChildEnv(["CURSOR_API_KEY"]),
-      onStdoutLine: (line) => reader.push(line),
+      onStdoutLine: (line) => reader.pushLine(line),
       onStderrLine: (line) =>
         ctx.emit({
           type: "cursor-acp.stderr",

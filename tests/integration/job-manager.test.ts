@@ -192,6 +192,8 @@ describe("job manager integration", () => {
     const { JobStore } = await import("../helpers.js");
     const store = new JobStore({ jobsDir });
     const id = newJobId();
+    const { currentBootId } = await import("../helpers.js");
+    const boot = currentBootId();
     store.create({
       jobId: id,
       originHost: "cursor",
@@ -207,6 +209,7 @@ describe("job manager integration", () => {
       status: "running",
       exitCode: null,
       pid: 999999999, // not alive
+      pidHostBootId: boot,
       startedAt: new Date().toISOString(),
       finishedAt: null,
     } as never);
@@ -215,6 +218,146 @@ describe("job manager integration", () => {
     const rec = store.get(id);
     expect(rec.status).toBe("failed");
   }, 20_000);
+
+  it("does not fail a running job whose pid is the current process", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    const jobsDir = path.join(repo, ".state", "jobs");
+    fs.mkdirSync(jobsDir, { recursive: true, mode: 0o700 });
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const { JobStore, currentBootId, newJobId } = await import("../helpers.js");
+    const store = new JobStore({ jobsDir });
+    const id = newJobId();
+    store.create({
+      jobId: id,
+      originHost: "cursor",
+      targetHost: "codex",
+      adapter: "codex-app-server",
+      mode: "investigate",
+      permissionProfile: "read-only",
+      handoffDepth: 0,
+      maxHandoffDepth: 1,
+      repoRoot: repo,
+      cwd: repo,
+      task: "live",
+      status: "running",
+      exitCode: null,
+      pid: process.pid,
+      pidHostBootId: currentBootId(),
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+    } as never);
+    const recovered = store.recover();
+    expect(recovered).not.toContain(id);
+    expect(store.get(id).status).toBe("running");
+  }, 20_000);
+
+  it("leaves a non-terminal job with unknown pid unchanged", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    const jobsDir = path.join(repo, ".state", "jobs");
+    fs.mkdirSync(jobsDir, { recursive: true, mode: 0o700 });
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const { JobStore, newJobId } = await import("../helpers.js");
+    const store = new JobStore({ jobsDir });
+    const id = newJobId();
+    store.create({
+      jobId: id,
+      originHost: "cursor",
+      targetHost: "codex",
+      adapter: "codex-app-server",
+      mode: "investigate",
+      permissionProfile: "read-only",
+      handoffDepth: 0,
+      maxHandoffDepth: 1,
+      repoRoot: repo,
+      cwd: repo,
+      task: "unknown-pid",
+      status: "running",
+      exitCode: null,
+      pid: null,
+      pidHostBootId: null,
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+    } as never);
+    expect(store.recover()).not.toContain(id);
+    expect(store.get(id).status).toBe("running");
+  }, 20_000);
+
+  it("cli origin with targetHost cursor records a cursor job", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-int-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const manager = makeManager(repo, scratch);
+    const enq = await manager.enqueue(
+      {
+        task: "from the cursor CLI family",
+        cwd: repo,
+        mode: "investigate",
+        permissionProfile: "read-only",
+        background: false,
+      },
+      { host: "cli", tool: "cli", client: "terminal", targetHost: "cursor" },
+    );
+    expect(enq.record.targetHost).toBe("cursor");
+    const listed = manager
+      .list()
+      .filter((j) => j.targetHost === "cursor")
+      .map((j) => j.jobId);
+    expect(listed).toContain(enq.jobId);
+  }, 20_000);
+
+  it("cli origin without targetHost fails loudly", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-int-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const manager = makeManager(repo, scratch);
+    await expect(
+      manager.enqueue(
+        {
+          task: "missing target",
+          cwd: repo,
+          mode: "investigate",
+          permissionProfile: "read-only",
+          background: false,
+        },
+        { host: "cli", tool: "cli" },
+      ),
+    ).rejects.toThrow(/target host/);
+  }, 20_000);
+
+  it("reply resumes the native Codex thread with the follow-up text", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-int-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const manager = makeManager(repo, scratch);
+    const enq = await manager.enqueue(
+      {
+        task: "investigate something",
+        cwd: repo,
+        mode: "investigate",
+        permissionProfile: "read-only",
+        background: false,
+      },
+      { host: "cursor", tool: "codex_start" },
+    );
+    const first = await manager.run(enq.jobId);
+    expect(first.nativeId).toMatch(/^thr-fake-/);
+    const follow = await manager.reply(enq.jobId, "also check clock skew");
+    expect(follow.accepted).toBe(true);
+    expect(follow.result?.nativeId).toBe(first.nativeId);
+    expect(follow.result?.summary).toContain("also check clock skew");
+    const record = manager.get(enq.jobId);
+    expect(record.events.some((e) => e.type === "followup.completed")).toBe(
+      true,
+    );
+  }, 30_000);
 
   it("handles a dirty working tree in current-workspace-write with a warning", async () => {
     const { repo, cleanup } = await makeTempRepo({});

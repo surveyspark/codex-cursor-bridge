@@ -61,7 +61,12 @@ export {
   sanitizeBranchName,
 } from "./paths.js";
 
-export { spawnProcess, buildChildEnv, isPidAlive } from "./process.js";
+export {
+  spawnProcess,
+  buildChildEnv,
+  isPidAlive,
+  currentBootId,
+} from "./process.js";
 export {
   resolveCursorCliName,
   resetCursorCliCache,
@@ -93,6 +98,8 @@ export {
   logsDir,
   defaultWorktreeRoot,
   redactedConfig,
+  validateBridgeConfig,
+  PROJECT_RESTRICTED_KEYS,
 } from "./config.js";
 export type { LoadedConfig } from "./config.js";
 

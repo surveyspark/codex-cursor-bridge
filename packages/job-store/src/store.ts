@@ -19,6 +19,7 @@ import path from "node:path";
 import {
   BridgeError,
   TERMINAL_JOB_STATUSES,
+  currentBootId,
   isPidAlive,
   redactDeep,
   type JobRecord,
@@ -300,42 +301,54 @@ export class JobStore {
 
   /**
    * Crash recovery: mark non-terminal jobs as failed when their worker
-   * process is gone. Returns recovered job ids.
+   * process is confirmed gone on this boot. A missing pid is unknown, not
+   * dead — leave those records alone so a sibling MCP server cannot fail
+   * a live job it does not own.
    */
   recover(workerPids?: Map<string, number>): string[] {
     const recovered: string[] = [];
+    const boot = currentBootId();
     for (const record of this.list()) {
       if (TERMINAL_JOB_STATUSES.has(record.status)) continue;
-      const pid = workerPids?.get(record.jobId) ?? record.pid ?? null;
-      const alive = pid !== null && isPidAlive(pid);
-      if (!alive) {
-        this.update(record.jobId, (r) => {
-          r.status = "failed";
-          r.finishedAt = nowIso();
-          r.result = {
-            jobId: r.jobId,
-            nativeId: r.nativeId ?? null,
-            adapter: r.adapter,
-            status: "failed",
-            summary:
-              "Bridge worker exited without recording a final status (crash or system restart). The underlying agent may still have been running; inspect the repository state before retrying.",
-            continuation: {
-              supported: r.nativeId != null,
-              how: r.nativeId
-                ? `resume via native id ${r.nativeId}`
-                : "not available",
-            },
-            failure: {
-              code: "JOB_STATE_CORRUPT",
-              message: "worker process lost",
-              retriable: true,
-            },
-            startedAt: r.startedAt ?? null,
-            finishedAt: nowIso(),
-          };
-        });
-        recovered.push(record.jobId);
+      const mapped = workerPids?.get(record.jobId);
+      const pid = mapped ?? record.pid ?? null;
+      const bootId =
+        mapped !== undefined ? boot : (record.pidHostBootId ?? null);
+      if (pid === null || bootId === null) {
+        // Unknown liveness: do not flip a live job to failed.
+        continue;
       }
+      const staleBoot = bootId !== boot;
+      const gone = !isPidAlive(pid);
+      if (!staleBoot && !gone) continue;
+      this.update(record.jobId, (r) => {
+        r.status = "failed";
+        r.finishedAt = nowIso();
+        r.result = {
+          jobId: r.jobId,
+          nativeId: r.nativeId ?? null,
+          adapter: r.adapter,
+          status: "failed",
+          summary:
+            "Bridge worker exited without recording a final status (crash or system restart). The underlying agent may still have been running; inspect the repository state before retrying.",
+          continuation: {
+            supported: r.nativeId != null,
+            how: r.nativeId
+              ? `resume via native id ${r.nativeId}`
+              : "not available",
+          },
+          failure: {
+            code: "JOB_STATE_CORRUPT",
+            message: staleBoot
+              ? "worker pid recorded on a previous boot"
+              : "worker process lost",
+            retriable: true,
+          },
+          startedAt: r.startedAt ?? null,
+          finishedAt: nowIso(),
+        };
+      });
+      recovered.push(record.jobId);
     }
     return recovered;
   }
