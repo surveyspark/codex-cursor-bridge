@@ -105,7 +105,7 @@ jobs:
           test -e "$BIN/codex-cursor-bridge"
           node "$BIN/codex-cursor-bridge" --version | grep -E '[0-9]+\.[0-9]+\.[0-9]+'
           node smoke/codex-cursor-bridge/codex-cursor-bridge.mjs doctor --json > /dev/null && echo "doctor json ok (exit $? tolerated)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-artifacts
           path: release/
