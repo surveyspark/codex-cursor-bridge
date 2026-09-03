@@ -129,6 +129,20 @@ export class JobManager {
     if (next) next();
   }
 
+  /**
+   * Adapter stdio can flush after the job record is gone (background MCP
+   * start + test/process teardown, or retention cleanup). JOB_NOT_FOUND
+   * on those callbacks is expected; other errors still propagate.
+   */
+  private ignoreGoneJob(fn: () => void): void {
+    try {
+      fn();
+    } catch (err) {
+      if (asBridgeError(err).code === "JOB_NOT_FOUND") return;
+      throw err;
+    }
+  }
+
   /** Validate + create the job record (queued). */
   async enqueue(
     request: StartRequest,
@@ -312,10 +326,11 @@ export class JobManager {
     }
     const git = await inspectGit(record.cwd);
     await this.gate();
-    const timeout = setTimeout(
-      () => abort.abort(new Error("timeout")),
-      record.timeoutMs ?? this.config.defaultTimeoutMs,
-    );
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      abort.abort(new Error("timeout"));
+    }, record.timeoutMs ?? this.config.defaultTimeoutMs);
 
     try {
       this.store.update(jobId, (r) => {
@@ -389,29 +404,42 @@ export class JobManager {
           CCB_HANDOFF_DEPTH: String(this.store.get(jobId).handoffDepth),
         },
         emit: (event) => {
-          this.store.appendEvent(jobId, event);
+          this.ignoreGoneJob(() => this.store.appendEvent(jobId, event));
         },
         approval: (approval) => {
-          this.store.update(jobId, (r) => {
-            r.approvals = [...(r.approvals ?? []), approval].slice(-500);
+          this.ignoreGoneJob(() => {
+            this.store.update(jobId, (r) => {
+              r.approvals = [...(r.approvals ?? []), approval].slice(-500);
+            });
           });
         },
         onNativeId: (nativeId) => {
-          this.store.update(jobId, (r) => {
-            r.nativeId = nativeId;
+          this.ignoreGoneJob(() => {
+            this.store.update(jobId, (r) => {
+              r.nativeId = nativeId;
+            });
           });
         },
       };
 
       const result = await adapter.run(request, ctx);
+      if (timedOut && result.status !== "completed") {
+        result.status = "timed-out";
+        result.failure = {
+          code: "JOB_TIMEOUT",
+          message: `job exceeded its ${record.timeoutMs ?? this.config.defaultTimeoutMs}ms timeout and was terminated.`,
+          retriable: true,
+        };
+      }
       return await this.finalize(jobId, result, record.cwd);
     } catch (err) {
       const be = asBridgeError(err);
       const abortedExplicitly = this.cancelReasons.get(jobId) !== undefined;
-      const status =
-        be.code === "JOB_CANCELLED" || abortedExplicitly
-          ? "cancelled"
-          : be.code === "JOB_TIMEOUT" || abort.signal.aborted
+      const status = abortedExplicitly
+        ? "cancelled"
+        : timedOut || be.code === "JOB_TIMEOUT"
+          ? "timed-out"
+          : abort.signal.aborted
             ? "timed-out"
             : "failed";
       const result: JobResult = {

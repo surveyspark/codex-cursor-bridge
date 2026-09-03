@@ -379,10 +379,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
           reason:
             "bridge runs Codex with approvalPolicy=never and narrow sandbox; escalation requests are denied",
         });
-        // Response shapes: { decision: "approved" | "denied" } historically;
-        // current schema uses reviewDecision "approved"|"denied" etc. Send the
-        // union-safe minimal denial.
-        return { decision: "denied", reviewDecision: "denied" };
+        // Live protocol (0.145+): a bare decision string.
+        return "decline";
       },
       onClose: () => {
         rpc.close();

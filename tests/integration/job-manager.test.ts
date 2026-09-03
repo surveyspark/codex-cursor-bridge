@@ -231,6 +231,77 @@ describe("job manager integration", () => {
     expect(result.failure?.code).toBe("JOB_CANCELLED");
   }, 20_000);
 
+  it("times out a job whose agent never finishes", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-int-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const fakeSlow = materializeFake(
+      scratch,
+      "fake-slow.cjs",
+      fakeCodexAppServer({ turnDelayMs: 60_000 }),
+    );
+    const manager = new JobManager({
+      repoRoot: repo,
+      config: { worktreeRoot: path.join(scratch, "worktrees") },
+      selectAdapter: async () => ({
+        adapter: new CodexAppServerAdapter({
+          argvOverride: [process.execPath, fakeSlow],
+        }),
+        reason: "fake slow",
+      }),
+    });
+    const enq = await manager.enqueue(
+      {
+        task: "never ends",
+        cwd: repo,
+        mode: "investigate",
+        permissionProfile: "read-only",
+        background: false,
+        timeoutMs: 800,
+      },
+      { host: "cursor" },
+    );
+    const result = await manager.run(enq.jobId);
+    expect(result.status).toBe("timed-out");
+  }, 20_000);
+
+  it("fails when the Codex adapter init is refused", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-int-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const fake = materializeFake(
+      scratch,
+      "fake-fail.cjs",
+      fakeCodexAppServer({ failInit: true }),
+    );
+    const manager = new JobManager({
+      repoRoot: repo,
+      config: { worktreeRoot: path.join(scratch, "worktrees") },
+      selectAdapter: async () => ({
+        adapter: new CodexAppServerAdapter({
+          argvOverride: [process.execPath, fake],
+        }),
+        reason: "fake fail",
+      }),
+    });
+    const enq = await manager.enqueue(
+      {
+        task: "init will fail",
+        cwd: repo,
+        mode: "investigate",
+        permissionProfile: "read-only",
+        background: false,
+      },
+      { host: "cursor" },
+    );
+    const result = await manager.run(enq.jobId);
+    expect(result.status).toBe("failed");
+  }, 20_000);
+
   it("recovers orphaned jobs after a simulated crash", async () => {
     const { repo, cleanup } = await makeTempRepo({});
     cleanups.push(cleanup);

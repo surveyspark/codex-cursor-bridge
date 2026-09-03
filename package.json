@@ -28,7 +28,9 @@
   ],
   "scripts": {
     "build": "tsc -b packages/tsconfig.project.json && node scripts/build-bundle.mjs",
-    "typecheck": "tsc -b packages/tsconfig.project.json --dry || tsc -b packages/tsconfig.project.json",
+    "typecheck": "tsc -b packages/tsconfig.project.json --force",
+    "demos": "node bundles/codex-cursor-bridge.mjs demos",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

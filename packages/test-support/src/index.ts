@@ -101,7 +101,7 @@ rl.on("line", (line) => {
     send({ jsonrpc: "2.0", method: "turn/started", params: { threadId: p.threadId, turn: { id: "turn-1", items: [], status: "inProgress" } } });
     const emit = () => {
       if (opts.emitApprovalRequest) {
-        send({ jsonrpc: "2.0", id: "srv-1", method: "execCommandApproval", params: { threadId: p.threadId, turnId: "turn-1", command: "rm -rf /", cwd: process.cwd(), reason: "test" } });
+        send({ jsonrpc: "2.0", id: "srv-1", method: "item/commandExecution/requestApproval", params: { threadId: p.threadId, turnId: "turn-1", command: "rm -rf /", cwd: process.cwd(), reason: "test" } });
       }
       send({ jsonrpc: "2.0", method: "item/completed", params: { threadId: p.threadId, turnId: "turn-1", completedAtMs: Date.now(), item: { id: "i1", type: "commandExecution", command: "echo fake", exitCode: 0, aggregatedOutput: "fake output with sk-abcdefghijklmnopqrstuvwx token", cwd: process.cwd(), status: "completed", commandActions: [] } } });
       send({ jsonrpc: "2.0", method: "item/completed", params: { threadId: p.threadId, turnId: "turn-1", completedAtMs: Date.now(), item: { id: "i2", type: "agentMessage", text: "fake final message. input=" + JSON.stringify(p.input || []).slice(0, 400) + " ## Bridge summary\\nAll clear." } } });
@@ -109,6 +109,13 @@ rl.on("line", (line) => {
       send({ jsonrpc: "2.0", id: msg.id, result: { turnId: "turn-1" } });
     };
     if (opts.turnDelayMs) setTimeout(emit, opts.turnDelayMs); else emit();
+  } else if (msg.id === "srv-1" && !msg.method) {
+    const d = msg.result;
+    const allowed = ["accept", "acceptForSession", "decline", "cancel"];
+    if (typeof d !== "string" || allowed.indexOf(d) < 0) {
+      send({ jsonrpc: "2.0", method: "error", params: { message: "invalid approval decision" } });
+      process.exit(2);
+    }
   } else if (msg.method === "turn/interrupt") {
     send({ jsonrpc: "2.0", id: msg.id, result: {} });
     setTimeout(() => process.exit(0), 50);
