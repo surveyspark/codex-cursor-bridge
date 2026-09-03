@@ -10,7 +10,11 @@
  *   errors when isolation is impossible and required).
  */
 
-import { BridgeError, canonicalize } from "@codex-cursor-bridge/bridge-core";
+import {
+  BridgeError,
+  canonicalize,
+  sanitizeBranchName,
+} from "@codex-cursor-bridge/bridge-core";
 import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -145,7 +149,9 @@ export async function createWorktree(
 
   const short = opts.jobId.replace(/^job_/, "").slice(0, 8);
   const repoName = path.basename(info.root).replace(/[^A-Za-z0-9._-]/g, "-");
-  const branch = `${opts.branchPrefix ?? "bridge"}${"/"}${repoName}-${short}`;
+  const branch = sanitizeBranchName(
+    `${opts.branchPrefix ?? "bridge"}/${repoName}-${short}`,
+  );
   const wtPath = path.join(opts.worktreeRoot, `${repoName}-${short}`);
 
   if (

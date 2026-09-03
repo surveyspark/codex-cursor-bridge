@@ -108,6 +108,8 @@ export class CodexExecAdapter implements AgentAdapter {
       "--json",
       "--sandbox",
       sandbox.sandboxMode,
+      "-c",
+      `sandbox_workspace_write.network_access=${ctx.networkPolicy === "allowed"}`,
       "--skip-git-repo-check",
       "-C",
       ctx.cwd,
@@ -152,7 +154,10 @@ export class CodexExecAdapter implements AgentAdapter {
     const child = spawnProcess({
       cwd: ctx.cwd,
       argv,
-      env: buildChildEnv(["OPENAI_API_KEY", "CODEX_HOME"], this.opts.extraEnv),
+      env: buildChildEnv(["OPENAI_API_KEY", "CODEX_HOME"], {
+        ...this.opts.extraEnv,
+        ...ctx.handoffEnv,
+      }),
       stdinData: buildTaskPrompt(request, "codex"),
       onStdoutLine: handleLine,
       onStderrLine: (line) => {

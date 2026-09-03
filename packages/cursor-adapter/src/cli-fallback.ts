@@ -135,7 +135,7 @@ export class CursorCliFallbackAdapter implements AgentAdapter {
     const child = spawnProcess({
       cwd: ctx.cwd,
       argv,
-      env: buildChildEnv(["CURSOR_API_KEY"]),
+      env: buildChildEnv(["CURSOR_API_KEY"], ctx.handoffEnv),
       stdinData: prompt,
       onStdoutLine: (line) => {
         const trimmed = line.trim();

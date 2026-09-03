@@ -258,3 +258,184 @@ describe("security: process-tree cancellation", () => {
     expect(alive).toBe(false);
   }, 20_000);
 });
+
+describe("security: mode and profile coupling", () => {
+  it("rejects every read-only mode paired with a write profile", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-sec-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const manager = makeManager(repo, scratch);
+    for (const mode of [
+      "investigate",
+      "review",
+      "adversarial-review",
+      "plan",
+      "rescue",
+    ] as const) {
+      for (const permissionProfile of [
+        "isolated-workspace-write",
+        "current-workspace-write",
+      ] as const) {
+        await expect(
+          manager.enqueue(
+            {
+              task: "should not write",
+              cwd: repo,
+              mode,
+              permissionProfile,
+              background: false,
+            },
+            { host: "cursor" },
+          ),
+        ).rejects.toThrow(/BRIDGE_USAGE|read-only/);
+      }
+    }
+  }, 20_000);
+});
+
+describe("security: cwd containment", () => {
+  it("rejects cwd outside the repo root", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-sec-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const manager = makeManager(repo, scratch);
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-out-"));
+    cleanups.push(() => fs.rmSync(outside, { recursive: true, force: true }));
+    await expect(
+      manager.enqueue(
+        {
+          task: "escape",
+          cwd: outside,
+          mode: "investigate",
+          permissionProfile: "read-only",
+          background: false,
+        },
+        { host: "cursor" },
+      ),
+    ).rejects.toThrow(/PATH_OUTSIDE_REPOSITORY|outside/);
+  }, 20_000);
+
+  it("rejects cwd containing .. that leaves the repo", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-sec-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const manager = makeManager(repo, scratch);
+    await expect(
+      manager.enqueue(
+        {
+          task: "dotdot",
+          cwd: path.join(repo, "..", path.basename(repo), ".."),
+          mode: "investigate",
+          permissionProfile: "read-only",
+          background: false,
+        },
+        { host: "cursor" },
+      ),
+    ).rejects.toThrow(/PATH_OUTSIDE_REPOSITORY|outside/);
+  }, 20_000);
+
+  it("rejects a cwd that is a symlink escaping the repo", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-sec-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-link-tgt-"));
+    cleanups.push(() => fs.rmSync(outside, { recursive: true, force: true }));
+    const link = path.join(repo, "escape-link");
+    fs.symlinkSync(outside, link);
+    const manager = makeManager(repo, scratch);
+    await expect(
+      manager.enqueue(
+        {
+          task: "symlink",
+          cwd: link,
+          mode: "investigate",
+          permissionProfile: "read-only",
+          background: false,
+        },
+        { host: "cursor" },
+      ),
+    ).rejects.toThrow(/PATH_OUTSIDE_REPOSITORY|PATH_ESCAPE|outside|escape/);
+  }, 20_000);
+});
+
+describe("security: derived handoff depth", () => {
+  it("treats a child of a depth-1 job as depth 2 and rejects it", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-sec-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const manager = makeManager(repo, scratch);
+    const parent = await manager.enqueue(
+      {
+        task: "parent",
+        cwd: repo,
+        mode: "investigate",
+        permissionProfile: "read-only",
+        background: false,
+        origin: { host: "cursor", handoffDepth: 1, maxHandoffDepth: 1 },
+      },
+      { host: "cursor" },
+    );
+    expect(parent.record.handoffDepth).toBe(1);
+    await expect(
+      manager.enqueue(
+        {
+          task: "child",
+          cwd: repo,
+          mode: "investigate",
+          permissionProfile: "read-only",
+          background: false,
+          origin: { host: "cursor", parentJobId: parent.jobId },
+        },
+        { host: "cursor" },
+      ),
+    ).rejects.toThrow(/RECURSION_BLOCKED|exceeds maximum/);
+  }, 20_000);
+});
+
+describe("security: Cursor read-only writes fail the job", () => {
+  it("fails a read-only ACP job that writes a file", async () => {
+    const { repo, cleanup } = await makeTempRepo({});
+    cleanups.push(cleanup);
+    process.env.CCB_STATE_DIR = path.join(repo, ".state");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ccb-sec-"));
+    cleanups.push(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const fakeAcp = materializeFake(
+      scratch,
+      "fake-write.cjs",
+      fakeCursorAcp({ writeRelativePath: "pwned.txt" }),
+    );
+    const manager = new JobManager({
+      repoRoot: repo,
+      config: { worktreeRoot: path.join(scratch, "worktrees") },
+      selectAdapter: async () => ({
+        adapter: new CursorAcpAdapter({
+          argvOverride: [process.execPath, fakeAcp],
+        }),
+        reason: "fake write",
+      }),
+    });
+    const enq = await manager.enqueue(
+      {
+        task: "please write",
+        cwd: repo,
+        mode: "investigate",
+        permissionProfile: "read-only",
+        background: false,
+      },
+      { host: "codex" },
+    );
+    const result = await manager.run(enq.jobId);
+    expect(result.status).not.toBe("completed");
+    expect(fs.existsSync(path.join(repo, "pwned.txt"))).toBe(false);
+  }, 40_000);
+});
