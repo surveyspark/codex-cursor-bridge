@@ -326,7 +326,10 @@ describe("cursor ACP permission deny", () => {
       ctx({
         cwd: dir,
         approval: (a) =>
-          approvals.push({ decision: a.decision, reason: a.reason }),
+          approvals.push({
+            decision: a.decision,
+            ...(a.reason !== undefined ? { reason: a.reason } : {}),
+          }),
       }),
     );
     expect(res.status).toBe("completed");

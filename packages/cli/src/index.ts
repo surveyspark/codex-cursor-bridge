@@ -40,6 +40,7 @@ import {
   BRIDGE_VERSION,
   isCliEntrypoint,
 } from "./shared.js";
+import { cliJobOrigin, jobsForCliHost } from "./origin.js";
 import { runDemos } from "./demos.js";
 
 interface ParsedArgs {
@@ -218,11 +219,7 @@ async function main(argv: string[]): Promise<void> {
 
       if (!sub || sub === "list") {
         const manager = await makeManager(repoRoot, overrides);
-        const jobs = manager
-          .list()
-          .filter((j) => j.targetHost === host)
-          .slice(-20)
-          .reverse();
+        const jobs = jobsForCliHost(manager.list(), host).slice(-20).reverse();
         if (flags.has("json")) {
           printJson(
             jobs.map((j) => ({
@@ -302,12 +299,10 @@ async function main(argv: string[]): Promise<void> {
             );
           }
           const manager = await makeManager(repoRoot, overrides);
-          const enq = await manager.enqueue(vr.value as StartRequest, {
-            host: "cli",
-            tool: "cli",
-            client: "terminal",
-            targetHost: host,
-          });
+          const enq = await manager.enqueue(
+            vr.value as StartRequest,
+            cliJobOrigin(host),
+          );
           process.stdout.write(`job ${enq.jobId} queued (${host})\n`);
           const result = await manager.run(enq.jobId);
           if (flags.has("json")) {

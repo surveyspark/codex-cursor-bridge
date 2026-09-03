@@ -12,6 +12,7 @@ import {
   CodexAppServerAdapter,
   CursorAcpAdapter,
 } from "../helpers.js";
+import { cliJobOrigin, jobsForCliHost } from "../../packages/cli/src/origin.js";
 
 const cleanups: Array<() => void> = [];
 afterAll(() => {
@@ -418,14 +419,14 @@ describe("job manager integration", () => {
         permissionProfile: "read-only",
         background: false,
       },
-      { host: "cli", tool: "cli", client: "terminal", targetHost: "cursor" },
+      cliJobOrigin("cursor"),
     );
     expect(enq.record.targetHost).toBe("cursor");
-    const listed = manager
-      .list()
-      .filter((j) => j.targetHost === "cursor")
-      .map((j) => j.jobId);
+    const listed = jobsForCliHost(manager.list(), "cursor").map((j) => j.jobId);
     expect(listed).toContain(enq.jobId);
+    expect(
+      jobsForCliHost(manager.list(), "codex").map((j) => j.jobId),
+    ).not.toContain(enq.jobId);
   }, 20_000);
 
   it("cli origin without targetHost fails loudly", async () => {
